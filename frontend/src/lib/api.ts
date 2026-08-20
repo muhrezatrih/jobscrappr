@@ -34,6 +34,28 @@ export interface SearchPreference {
   jobstreetCookies?: string;
 }
 
+export type ApplicationStage =
+  | 'DISCOVERED'
+  | 'SKIPPED'
+  | 'APPLIED'
+  | 'HR_SCREENING'
+  | 'TECHNICAL_TEST'
+  | 'FINAL_INTERVIEW'
+  | 'OFFER_RECEIVED'
+  | 'OFFER_ACCEPTED'
+  | 'OFFER_DECLINED'
+  | 'REJECTED'
+  | 'GHOSTED';
+
+export interface StageHistoryItem {
+  id: string;
+  applicationId: string;
+  fromStatus?: string | null;
+  toStatus: string;
+  note?: string | null;
+  changedAt: string;
+}
+
 export interface JobApplication {
   id: string;
   jobId?: string;
@@ -50,37 +72,122 @@ export interface JobApplication {
   matchReason?: string;
   strengths: string[];
   skillGaps: string[];
-  status: 'QUEUED' | 'EVALUATING' | 'APPLIED' | 'SKIPPED' | 'FAILED' | 'SIMULATED';
+  status: ApplicationStage;
   statusMessage?: string;
+  recruiterName?: string;
+  recruiterContact?: string;
+  offeredSalary?: string;
+  targetSalary?: string;
+  notes?: string;
+  interviewDate?: string;
+  nextFollowUpDate?: string;
+  postedAt?: string;
   customCoverLetter?: string;
   screeningAnswers?: Array<{ question: string; answer: string; reasoning?: string }>;
+  stageHistory?: StageHistoryItem[];
   appliedAt?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
-export interface DashboardKPIs {
-  totalApplications: number;
-  todayApplications: number;
-  appliedCount: number;
-  simulatedCount: number;
-  skippedCount: number;
-  failedCount: number;
-  averageMatchScore: number;
-  recentApplications: JobApplication[];
+export interface EvaluatedScrapedJob {
+  jobId: string;
+  title: string;
+  company: string;
+  location: string;
+  salary?: string;
+  jobUrl: string;
+  portal: 'LINKEDIN' | 'JOBSTREET';
+  postedAt?: string;
+  description?: string;
+  requirements?: string;
+  matchScore: number;
+  matchReason: string;
+  strengths: string[];
+  skillGaps: string[];
+  recommendation: 'STRONG_MATCH' | 'GOOD_MATCH' | 'POTENTIAL_GAP' | 'LOW_FIT';
+  trackedStatus?: string | null;
+  trackedApplicationId?: string | null;
 }
 
-export interface WorkerStatusResponse {
-  status: 'IDLE' | 'RUNNING' | 'PAUSED' | 'STOPPED';
-  progress: {
-    totalEvaluated: number;
-    appliedToday: number;
-    skipped: number;
-    failed: number;
-    currentJob: string;
+export interface SankeyNode {
+  id: string;
+  label: string;
+  color: string;
+  column: number;
+}
+
+export interface SankeyLink {
+  source: string;
+  target: string;
+  value: number;
+}
+
+export interface SankeyAnalyticsResponse {
+  nodes: SankeyNode[];
+  links: SankeyLink[];
+  totals: {
+    discovered: number;
+    applied: number;
+    screening: number;
+    technical: number;
+    finalInterview: number;
+    offer: number;
+    accepted: number;
+    rejected: number;
+    ghosted: number;
+  };
+  conversionRates: {
+    discoveredToApplied: number;
+    appliedToScreening: number;
+    screeningToTech: number;
+    techToFinal: number;
+    finalToOffer: number;
+    overallConversionRate: number;
   };
 }
 
+export interface DashboardKPIs {
+  totalTracked: number;
+  discoveredCount: number;
+  appliedCount: number;
+  screeningCount: number;
+  technicalCount: number;
+  finalCount: number;
+  activeInterviews: number;
+  offerCount: number;
+  rejectedCount: number;
+  ghostedCount: number;
+  skippedCount: number;
+  averageMatchScore: number;
+  upcomingInterviews: JobApplication[];
+  recentApplications: JobApplication[];
+}
+
 export const api = {
+  // Scraper & Discovery
+  async searchScraper(params: {
+    keywords?: string;
+    location?: string;
+    portals?: ('LINKEDIN' | 'JOBSTREET')[];
+    past24Hours?: boolean;
+  }): Promise<EvaluatedScrapedJob[]> {
+    const res = await fetch(`${API_BASE}/scraper/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    if (!res.ok) throw new Error('Failed to scrape jobs from portals');
+    return res.json();
+  },
+
+  // Sankey Funnel Analytics
+  async getSankeyAnalytics(): Promise<SankeyAnalyticsResponse> {
+    const res = await fetch(`${API_BASE}/jobs/analytics/sankey`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load Sankey analytics');
+    return res.json();
+  },
+
   // Candidate Profile & CV
   async getProfile(): Promise<CandidateProfile> {
     const res = await fetch(`${API_BASE}/candidate/profile`, { cache: 'no-store' });
@@ -105,14 +212,13 @@ export const api = {
       method: 'POST',
       body: formData,
     });
-    if (!res.ok) throw new Error('Failed to upload and extract resume');
+    if (!res.ok) throw new Error('Failed to upload and extract CV');
     return res.json();
   },
 
-  // Preferences
   async getPreferences(): Promise<SearchPreference> {
     const res = await fetch(`${API_BASE}/candidate/preferences`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load preferences');
+    if (!res.ok) throw new Error('Failed to load search preferences');
     return res.json();
   },
 
@@ -122,58 +228,23 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update preferences');
+    if (!res.ok) throw new Error('Failed to save search preferences');
     return res.json();
   },
 
-  // Automation Worker
-  async getWorkerStatus(): Promise<WorkerStatusResponse> {
-    const res = await fetch(`${API_BASE}/automation/status`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load worker status');
+  async getLogs(limit: number = 200): Promise<any[]> {
+    const res = await fetch(`${API_BASE}/logs?limit=${limit}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load logs');
     return res.json();
   },
 
-  async startWorker(dryRun?: boolean): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/automation/start`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dryRun }),
-    });
+  async clearLogs(): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/logs`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to clear logs');
     return res.json();
   },
 
-  async pauseWorker(): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/automation/pause`, { method: 'POST' });
-    return res.json();
-  },
-
-  async resumeWorker(): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/automation/resume`, { method: 'POST' });
-    return res.json();
-  },
-
-  async stopWorker(): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${API_BASE}/automation/stop`, { method: 'POST' });
-    return res.json();
-  },
-
-  async runSingleJobTest(jobTitle?: string, companyName?: string) {
-    const res = await fetch(`${API_BASE}/automation/test-single`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobTitle, companyName }),
-    });
-    if (!res.ok) throw new Error('Failed to execute single test match');
-    return res.json();
-  },
-
-  // Jobs & Applications
-  async getDashboardKPIs(): Promise<DashboardKPIs> {
-    const res = await fetch(`${API_BASE}/jobs/dashboard/kpis`, { cache: 'no-store' });
-    if (!res.ok) throw new Error('Failed to load dashboard KPIs');
-    return res.json();
-  },
-
+  // Applications & Pipeline Management
   async getApplications(params?: {
     search?: string;
     status?: string;
@@ -201,22 +272,58 @@ export const api = {
     return res.json();
   },
 
-  async deleteApplication(id: string) {
-    const res = await fetch(`${API_BASE}/jobs/applications/${id}`, { method: 'DELETE' });
+  async trackJob(data: Partial<JobApplication>): Promise<JobApplication> {
+    const res = await fetch(`${API_BASE}/jobs/applications/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    if (!res.ok) throw new Error('Failed to track job application');
     return res.json();
   },
 
-  // Logs
-  async getLogs(limit = 100, level?: string) {
-    const query = new URLSearchParams();
-    query.set('limit', limit.toString());
-    if (level) query.set('level', level);
-    const res = await fetch(`${API_BASE}/logs?${query.toString()}`, { cache: 'no-store' });
+  async updateStatus(id: string, status: string, note?: string): Promise<JobApplication> {
+    const res = await fetch(`${API_BASE}/jobs/applications/${id}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, note }),
+    });
+    if (!res.ok) throw new Error('Failed to update application status');
     return res.json();
   },
 
-  async clearLogs() {
-    const res = await fetch(`${API_BASE}/logs`, { method: 'DELETE' });
+  async updateDetails(
+    id: string,
+    details: {
+      notes?: string;
+      recruiterName?: string;
+      recruiterContact?: string;
+      offeredSalary?: string;
+      targetSalary?: string;
+      interviewDate?: string | null;
+      nextFollowUpDate?: string | null;
+    },
+  ): Promise<JobApplication> {
+    const res = await fetch(`${API_BASE}/jobs/applications/${id}/details`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(details),
+    });
+    if (!res.ok) throw new Error('Failed to update application details');
+    return res.json();
+  },
+
+  async deleteApplication(id: string): Promise<{ success: boolean }> {
+    const res = await fetch(`${API_BASE}/jobs/applications/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to delete application');
+    return res.json();
+  },
+
+  async getDashboardKPIs(): Promise<DashboardKPIs> {
+    const res = await fetch(`${API_BASE}/jobs/dashboard/kpis`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load dashboard KPIs');
     return res.json();
   },
 };

@@ -3,9 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Play,
-  Pause,
-  Square,
   Sparkles,
   Briefcase,
   TrendingUp,
@@ -14,480 +11,220 @@ import {
   ChevronRight,
   RefreshCw,
   Search,
+  CheckCircle2,
+  Building2,
+  Clock,
+  ArrowRight,
+  Kanban,
+  Award,
 } from 'lucide-react';
-import { api, DashboardKPIs, WorkerStatusResponse, JobApplication } from '@/lib/api';
-import { MetricCard } from '@/components/MetricCard';
-import { StatusBadge } from '@/components/StatusBadge';
+import { api, DashboardKPIs, SankeyAnalyticsResponse, JobApplication } from '@/lib/api';
+import DiscoveryFeed from '@/components/DiscoveryFeed';
 import { ApplicationDrawer } from '@/components/ApplicationDrawer';
-import { LiveLogStream } from '@/components/LiveLogStream';
+import { StatusBadge } from '@/components/StatusBadge';
 
 export default function DashboardPage() {
   const [kpis, setKpis] = useState<DashboardKPIs | null>(null);
-  const [workerStatus, setWorkerStatus] = useState<WorkerStatusResponse | null>(null);
+  const [sankeyData, setSankeyData] = useState<SankeyAnalyticsResponse | null>(null);
   const [selectedApp, setSelectedApp] = useState<JobApplication | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [dryRun, setDryRun] = useState<boolean>(true);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const loadData = async () => {
     try {
-      const [kpiData, statusData, prefData] = await Promise.all([
+      const [kpiData, sankey] = await Promise.all([
         api.getDashboardKPIs(),
-        api.getWorkerStatus(),
-        api.getPreferences(),
+        api.getSankeyAnalytics(),
       ]);
       setKpis(kpiData);
-      setWorkerStatus(statusData);
-      setDryRun(prefData.dryRunMode);
+      setSankeyData(sankey);
     } catch (e) {
       console.error('Failed to load dashboard data', e);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 4000);
-    return () => clearInterval(interval);
   }, []);
 
-  const handleStartWorker = async () => {
-    setIsLoading(true);
-    try {
-      const res = await api.startWorker(dryRun);
-      showToast(res.message || 'Automation started successfully');
-      await loadData();
-    } catch (e: any) {
-      showToast('Failed to start: ' + e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePauseWorker = async () => {
-    try {
-      await api.pauseWorker();
-      showToast('Automation paused');
-      await loadData();
-    } catch (e: any) {
-      showToast('Failed to pause: ' + e.message);
-    }
-  };
-
-  const handleResumeWorker = async () => {
-    try {
-      await api.resumeWorker();
-      showToast('Automation resumed');
-      await loadData();
-    } catch (e: any) {
-      showToast('Failed to resume: ' + e.message);
-    }
-  };
-
-  const handleStopWorker = async () => {
-    try {
-      await api.stopWorker();
-      showToast('Automation stopped');
-      await loadData();
-    } catch (e: any) {
-      showToast('Failed to stop: ' + e.message);
-    }
-  };
-
-  const handleQuickTest = async () => {
-    setIsLoading(true);
-    try {
-      showToast('Running single job evaluation with Gemini AI...');
-      const res = await api.runSingleJobTest();
-      showToast(`Test completed! Match Score: ${res.matchResult.matchScore}%`);
-      await loadData();
-      if (res.application) {
-        setSelectedApp(res.application);
-      }
-    } catch (e: any) {
-      showToast('Test failed: ' + e.message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const status = workerStatus?.status || 'IDLE';
-
-  const recentApps = (kpis?.recentApplications || []).filter((app) => {
-    const matchesFilter = statusFilter === 'ALL' || app.status === statusFilter;
-    const matchesSearch =
-      !searchQuery ||
-      app.jobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.companyName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '2rem',
-            right: '2rem',
-            zIndex: 999,
-            background: 'var(--surface-glass)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid var(--apple-blue)',
-            color: 'var(--text-primary)',
-            padding: '0.85rem 1.25rem',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: 'var(--shadow-lg)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.6rem',
-            fontSize: '0.875rem',
-            fontWeight: 500,
-            animation: 'fadeIn 0.2s ease-out',
-          }}
-        >
-          <Sparkles size={16} color="var(--apple-blue)" />
-          <span>{toastMessage}</span>
+    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-6 md:p-10 space-y-8">
+      {/* Top Banner */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 font-semibold text-xs uppercase tracking-wider mb-1">
+            <Sparkles className="w-4 h-4" />
+            <span>AI Job Discovery & Pipeline</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight">
+            JobFlow Scrappr
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+            Scrape 24h backend jobs, analyze fit against your CV, track stages, and visualize Sankey funnel.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-3">
+          <Link
+            href="/applications"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl text-xs font-bold hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-all shadow-sm"
+          >
+            <Kanban className="w-4 h-4 text-blue-600" />
+            <span>Open Kanban Pipeline</span>
+          </Link>
+
+          <Link
+            href="/analytics"
+            className="flex items-center space-x-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>View Full Sankey Funnel</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* KPI Overview Cards */}
+      {kpis && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                Total Tracked
+              </span>
+              <Briefcase className="w-4 h-4 text-blue-500" />
+            </div>
+            <div className="text-3xl font-black tracking-tight">{kpis.totalTracked}</div>
+            <span className="text-xs text-zinc-500 font-medium block">
+              {kpis.appliedCount} Applied • {kpis.skippedCount} Skipped
+            </span>
+          </div>
+
+          <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                Interviews in Progress
+              </span>
+              <Calendar className="w-4 h-4 text-purple-500" />
+            </div>
+            <div className="text-3xl font-black tracking-tight text-purple-600 dark:text-purple-400">
+              {kpis.activeInterviews}
+            </div>
+            <span className="text-xs text-zinc-500 font-medium block">
+              {kpis.screeningCount} Screen • {kpis.technicalCount} Tech • {kpis.finalCount} Final
+            </span>
+          </div>
+
+          <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                Offers Received
+              </span>
+              <Award className="w-4 h-4 text-emerald-500" />
+            </div>
+            <div className="text-3xl font-black tracking-tight text-emerald-600 dark:text-emerald-400">
+              {kpis.offerCount}
+            </div>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold block">
+              🎉 Final Conversion Success
+            </span>
+          </div>
+
+          <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-5 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
+                Average AI Match
+              </span>
+              <Sparkles className="w-4 h-4 text-amber-500" />
+            </div>
+            <div className="text-3xl font-black tracking-tight text-zinc-900 dark:text-zinc-100">
+              {kpis.averageMatchScore}%
+            </div>
+            <span className="text-xs text-zinc-500 font-medium block">
+              Based on your CV qualifications
+            </span>
+          </div>
         </div>
       )}
 
-      {/* Hero / Executive Control Center */}
-      <section
-        className="glass-panel"
-        style={{
-          padding: '2rem 2.25rem',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '1.5rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1.25rem' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.35rem' }}>
-              <span
-                className={`pulse-dot ${
-                  status === 'RUNNING' ? 'running' : status === 'PAUSED' ? 'paused' : 'idle'
-                }`}
-              />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Engine Status: {status}
-              </span>
+      {/* Mini Sankey Funnel Preview Banner */}
+      {sankeyData && (
+        <div className="bg-gradient-to-r from-blue-600/10 via-purple-600/10 to-pink-600/10 dark:from-blue-950/30 dark:via-purple-950/30 dark:to-pink-950/30 p-6 rounded-3xl border border-blue-200/60 dark:border-blue-800/40 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1 max-w-lg">
+            <div className="flex items-center space-x-2 text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+              <TrendingUp className="w-4 h-4" />
+              <span>Sankey Funnel Velocity</span>
             </div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.035em' }}>
-              AI Job Auto-Applier
-            </h1>
-            <p style={{ fontSize: '0.925rem', color: 'var(--text-secondary)', maxWidth: '580px', marginTop: '0.35rem' }}>
-              Precision job search automation powered by Google Gemini AI to evaluate CV compatibility, generate tailored cover letters, and submit applications directly.
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              {sankeyData.totals.applied} Applied ➔ {sankeyData.totals.screening} Screened ➔{' '}
+              {sankeyData.totals.offer} Offers ({sankeyData.conversionRates.overallConversionRate}% conversion)
+            </h3>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Track real-time candidate flow and drop-offs automatically as you update job application statuses.
             </p>
           </div>
 
-          {/* Action Control Panel */}
-          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            {/* Dry-Run Toggle */}
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.6rem',
-                padding: '0.5rem 0.95rem',
-                background: 'var(--surface-glass-card)',
-                borderRadius: 'var(--radius-full)',
-                border: '1px solid var(--border-medium)',
-                fontSize: '0.8rem',
-              }}
-            >
-              <span style={{ color: dryRun ? 'var(--apple-blue)' : 'var(--text-secondary)', fontWeight: 600 }}>
-                {dryRun ? 'Simulation Mode (Dry-Run)' : 'Live Apply Mode'}
-              </span>
-              <input
-                type="checkbox"
-                checked={dryRun}
-                onChange={(e) => setDryRun(e.target.checked)}
-                style={{ cursor: 'pointer', accentColor: 'var(--apple-blue)' }}
-              />
-            </div>
-
-            {/* Start / Pause / Stop Buttons */}
-            {status === 'IDLE' || status === 'STOPPED' ? (
-              <button
-                onClick={handleStartWorker}
-                disabled={isLoading}
-                className="btn-primary"
-              >
-                <Play size={16} fill="currentColor" />
-                <span>Start Auto-Apply</span>
-              </button>
-            ) : status === 'RUNNING' ? (
-              <>
-                <button onClick={handlePauseWorker} className="btn-secondary">
-                  <Pause size={16} />
-                  <span>Pause</span>
-                </button>
-                <button onClick={handleStopWorker} className="btn-danger">
-                  <Square size={16} />
-                  <span>Stop</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <button onClick={handleResumeWorker} className="btn-primary">
-                  <Play size={16} fill="currentColor" />
-                  <span>Resume</span>
-                </button>
-                <button onClick={handleStopWorker} className="btn-danger">
-                  <Square size={16} />
-                  <span>Stop</span>
-                </button>
-              </>
-            )}
-
-            {/* Quick Single Test */}
-            <button
-              onClick={handleQuickTest}
-              disabled={isLoading || status === 'RUNNING'}
-              className="btn-secondary"
-              title="Test evaluation on a single sample job with AI"
-            >
-              <Sparkles size={15} color="var(--apple-purple)" />
-              <span>Test Match</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Live Status Progress Summary Bar */}
-        {workerStatus?.progress && workerStatus.progress.totalEvaluated > 0 && (
-          <div
-            style={{
-              padding: '0.85rem 1.25rem',
-              background: 'var(--surface-glass-card-hover)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-subtle)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              fontSize: '0.825rem',
-            }}
+          <Link
+            href="/analytics"
+            className="flex items-center space-x-2 px-5 py-3 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 rounded-2xl text-xs font-bold hover:scale-105 transition-all shadow-md flex-shrink-0"
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-              <RefreshCw size={15} className="spin" color="var(--apple-blue)" />
-              <span>
-                <strong>Latest Activity:</strong> {workerStatus.progress.currentJob || 'Evaluating job postings...'}
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '1.25rem', color: 'var(--text-secondary)' }}>
-              <span>Evaluated: <strong>{workerStatus.progress.totalEvaluated}</strong></span>
-              <span>Processed: <strong style={{ color: 'var(--apple-green)' }}>{workerStatus.progress.appliedToday}</strong></span>
-              <span>Skipped: <strong>{workerStatus.progress.skipped}</strong></span>
-            </div>
-          </div>
-        )}
-      </section>
+            <span>Interactive Sankey Diagram</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
 
-      {/* 4 Metric Cards */}
-      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1.25rem' }}>
-        <MetricCard
-          title="Total Processed Applications"
-          value={kpis?.totalApplications || 0}
-          subtitle="All-time pipeline"
-          icon={Briefcase}
-          variant="blue"
-        />
-        <MetricCard
-          title="Applications Today"
-          value={kpis?.todayApplications || 0}
-          subtitle="Daily quota: max 15/day"
-          icon={Calendar}
-          variant="green"
-          trend={`${kpis?.appliedCount || 0} Live / ${kpis?.simulatedCount || 0} Simulated`}
-        />
-        <MetricCard
-          title="Average Match Score"
-          value={`${kpis?.averageMatchScore || 0}%`}
-          subtitle="Alignment with your CV"
-          icon={Target}
-          variant="purple"
-          trend="Threshold min 70%"
-        />
-        <MetricCard
-          title="Submitted / Qualified"
-          value={(kpis?.appliedCount || 0) + (kpis?.simulatedCount || 0)}
-          subtitle={`${kpis?.skippedCount || 0} jobs skipped`}
-          icon={TrendingUp}
-          variant="amber"
-        />
-      </section>
-
-      {/* Main Content Grid: Recent Applications & Live Terminal */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.45fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
-        {/* Left Column: Recent Applications Pipeline */}
-        <section className="glass-panel" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+      {/* Upcoming Interviews Reminder Bar (if any) */}
+      {kpis?.upcomingInterviews && kpis.upcomingInterviews.length > 0 && (
+        <div className="bg-pink-50/80 dark:bg-pink-950/30 p-5 rounded-3xl border border-pink-200/80 dark:border-pink-800/60 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-pink-500 text-white rounded-2xl">
+              <Calendar className="w-5 h-5" />
+            </div>
             <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700 }}>Recent Applications Pipeline</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                Click any row to inspect AI reasoning, cover letter, and screening answers.
+              <span className="text-xs font-bold text-pink-700 dark:text-pink-300 uppercase tracking-wider block">
+                Upcoming Interview Scheduled
+              </span>
+              <p className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                {kpis.upcomingInterviews[0].jobTitle} at {kpis.upcomingInterviews[0].companyName} —{' '}
+                {new Date(kpis.upcomingInterviews[0].interviewDate!).toLocaleDateString()}
               </p>
             </div>
-            <Link
-              href="/applications"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.3rem',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                color: 'var(--apple-blue)',
-              }}
-            >
-              <span>View All</span>
-              <ChevronRight size={14} />
-            </Link>
           </div>
+          <button
+            type="button"
+            onClick={() => setSelectedApp(kpis.upcomingInterviews[0])}
+            className="px-4 py-2 bg-white dark:bg-zinc-900 border border-pink-200 dark:border-pink-800 text-xs font-bold text-pink-700 dark:text-pink-300 rounded-xl"
+          >
+            View Prep Notes
+          </button>
+        </div>
+      )}
 
-          {/* Search & Status Filter Bar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '180px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
-              <input
-                type="text"
-                placeholder="Search job title or company..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="apple-input"
-                style={{ paddingLeft: '2.2rem', fontSize: '0.8rem', padding: '0.45rem 0.75rem 0.45rem 2.2rem' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '0.3rem', overflowX: 'auto', paddingBottom: '0.2rem' }}>
-              {['ALL', 'APPLIED', 'SIMULATED', 'SKIPPED', 'FAILED'].map((st) => (
-                <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  style={{
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: 'var(--radius-full)',
-                    fontSize: '0.725rem',
-                    fontWeight: 600,
-                    background: statusFilter === st ? 'var(--apple-blue-soft)' : 'var(--surface-glass-card)',
-                    color: statusFilter === st ? 'var(--apple-blue)' : 'var(--text-secondary)',
-                    border: `1px solid ${statusFilter === st ? 'var(--apple-blue)' : 'var(--border-subtle)'}`,
-                    transition: 'all var(--transition-fast)',
-                  }}
-                >
-                  {st === 'ALL' ? 'All' : st}
-                </button>
-              ))}
-            </div>
+      {/* Main Feature: Discovery Scraper Feed */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-blue-600" />
+            <h2 className="text-xl font-bold tracking-tight">
+              On-Demand 24-Hour Job Scraper
+            </h2>
           </div>
+          <span className="text-xs text-zinc-500">LinkedIn & Jobstreet</span>
+        </div>
 
-          {/* Table of Applications */}
-          {recentApps.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '3rem 1.5rem', color: 'var(--text-secondary)', background: 'var(--surface-glass-card)', borderRadius: 'var(--radius-md)' }}>
-              <Briefcase size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.4 }} />
-              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)' }}>No applications found</p>
-              <p style={{ fontSize: '0.8rem', marginTop: '0.25rem' }}>Click "Test Match" or "Start Auto-Apply" to begin.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {recentApps.map((app) => (
-                <div
-                  key={app.id}
-                  onClick={() => setSelectedApp(app)}
-                  className="glass-card"
-                  style={{
-                    padding: '0.95rem 1.15rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: '1rem',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                    {/* Match Score Indicator */}
-                    <div
-                      style={{
-                        width: '42px',
-                        height: '42px',
-                        borderRadius: '50%',
-                        background:
-                          app.matchScore >= 70
-                            ? 'var(--apple-green-soft)'
-                            : app.matchScore > 0
-                            ? 'var(--apple-amber-soft)'
-                            : 'rgba(255,255,255,0.05)',
-                        border: `2px solid ${
-                          app.matchScore >= 70
-                            ? 'var(--apple-green)'
-                            : app.matchScore > 0
-                            ? 'var(--apple-amber)'
-                            : 'var(--border-subtle)'
-                        }`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: '0.8rem',
-                        color: 'var(--text-primary)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {app.matchScore}%
-                    </div>
-
-                    <div>
-                      <h4 style={{ fontSize: '0.925rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.25 }}>
-                        {app.jobTitle}
-                      </h4>
-                      <div style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                        {app.companyName} {app.location ? `• ${app.location}` : ''}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0 }}>
-                    <StatusBadge status={app.status} size="sm" />
-                    <ChevronRight size={16} color="var(--text-tertiary)" />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Right Column: Live Terminal Stream */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <LiveLogStream maxHeight="440px" />
-
-          {/* Quick Profile Summary Card */}
-          <div className="glass-card" style={{ padding: '1.25rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Active Criteria
-              </span>
-              <Link href="/profile" style={{ fontSize: '0.75rem', color: 'var(--apple-blue)', fontWeight: 600 }}>
-                Edit Criteria →
-              </Link>
-            </div>
-            <p style={{ fontSize: '0.775rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              Target: Fullstack, Backend Engineer • Location: Jakarta, Remote • Min Score: 70%
-            </p>
-          </div>
-        </section>
+        <DiscoveryFeed
+          onJobTracked={(app) => {
+            loadData();
+          }}
+        />
       </div>
 
-      {/* Drill-down Detail Drawer */}
+      {/* Application Drawer */}
       <ApplicationDrawer
         application={selectedApp}
         onClose={() => setSelectedApp(null)}
+        onUpdate={loadData}
       />
     </div>
   );

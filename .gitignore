@@ -10,6 +10,7 @@ out/
 # NestJS / TypeScript
 dist/
 */dist/
+*.tsbuildinfo
 
 # Environment variables
 .env

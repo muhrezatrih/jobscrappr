@@ -11,7 +11,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CandidateService } from './candidate.service';
 
-@Controller('api/candidate')
+@Controller('candidate')
 export class CandidateController {
   constructor(private candidateService: CandidateService) {}
 

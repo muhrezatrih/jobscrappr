@@ -2,7 +2,7 @@ import { Controller, Get, Sse, MessageEvent, Query, Delete } from '@nestjs/commo
 import { LogsService } from './logs.service';
 import { Observable, map } from 'rxjs';
 
-@Controller('api/logs')
+@Controller('logs')
 export class LogsController {
   constructor(private logsService: LogsService) {}
 

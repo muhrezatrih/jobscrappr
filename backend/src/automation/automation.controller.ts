@@ -1,7 +1,7 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
 import { JobstreetWorkerService } from './jobstreet-worker.service';
 
-@Controller('api/automation')
+@Controller('automation')
 export class AutomationController {
   constructor(private worker: JobstreetWorkerService) {}
 

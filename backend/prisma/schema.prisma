@@ -49,7 +49,7 @@ model SearchPreference {
 }
 
 model JobApplication {
-  id                  String    @id @default(uuid())
+  id                  String         @id @default(uuid())
   jobId               String?
   jobTitle            String
   companyName         String
@@ -57,27 +57,58 @@ model JobApplication {
   location            String?
   salaryInfo          String?
   jobUrl              String
-  portal              String    @default("JOBSTREET")
-  jobDescription      String?   @db.Text
-  requirements        String?   @db.Text
-  matchScore          Int       @default(0)
-  matchReason         String?   @db.Text
+  portal              String         @default("LINKEDIN") // LINKEDIN, JOBSTREET, MANUAL
+  jobDescription      String?        @db.Text
+  requirements        String?        @db.Text
+  matchScore          Int            @default(0)
+  matchReason         String?        @db.Text
   strengths           String[]
   skillGaps           String[]
-  status              String    @default("QUEUED")
+  
+  // Pipeline Stage: DISCOVERED, SKIPPED, APPLIED, HR_SCREENING, TECHNICAL_TEST, FINAL_INTERVIEW, OFFER_RECEIVED, OFFER_ACCEPTED, OFFER_DECLINED, REJECTED, GHOSTED
+  status              String         @default("DISCOVERED")
   statusMessage       String?
-  customCoverLetter   String?   @db.Text
+  
+  // Application & Interview Tracking Details
+  recruiterName       String?
+  recruiterContact    String?
+  offeredSalary       String?
+  targetSalary        String?
+  notes               String?        @db.Text
+  interviewDate       DateTime?
+  nextFollowUpDate    DateTime?
+  postedAt            DateTime?
+  
+  customCoverLetter   String?        @db.Text
   screeningAnswers    Json?
   appliedAt           DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  stageHistory        StageHistory[]
+
+  @@index([status])
+  @@index([portal])
+}
+
+model StageHistory {
+  id            String         @id @default(uuid())
+  applicationId String
+  application   JobApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  fromStatus    String?
+  toStatus      String
+  note          String?        @db.Text
+  changedAt     DateTime       @default(now())
+
+  @@index([applicationId])
+  @@index([toStatus])
 }
 
 model ExecutionLog {
   id        String   @id @default(uuid())
   timestamp DateTime @default(now())
   level     String   @default("INFO")
-  source    String   @default("WORKER")
+  source    String   @default("SCRAPER")
   action    String
   message   String   @db.Text
   metadata  Json?
