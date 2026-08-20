@@ -24,13 +24,24 @@ export function Navbar() {
     const currentTheme = (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
     setTheme(currentTheme);
     root.setAttribute('data-theme', currentTheme);
+    if (currentTheme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
   }, []);
 
   const toggleTheme = () => {
     const nextTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(nextTheme);
     localStorage.setItem('theme', nextTheme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', nextTheme);
+    if (nextTheme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
   };
 
   const navItems = [

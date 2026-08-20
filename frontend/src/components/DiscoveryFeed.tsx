@@ -157,7 +157,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
               placeholder="Job Title or Keywords (e.g. Backend Developer, Golang, Node.js)"
               value={keywords}
               onChange={(e) => setKeywords(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 
@@ -168,7 +168,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
               placeholder="Location (e.g. Indonesia, Remote)"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full pl-11 pr-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-2xl border border-zinc-200 dark:border-zinc-700/80 text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             />
           </div>
 

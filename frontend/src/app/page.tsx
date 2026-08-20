@@ -57,10 +57,10 @@ export default function DashboardPage() {
             <Sparkles className="w-4 h-4" />
             <span>AI Job Discovery & Pipeline</span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight">
+          <h1 className="text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-100">
             JobFlow Scrappr
           </h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
             Scrape 24h backend jobs, analyze fit against your CV, track stages, and visualize Sankey funnel.
           </p>
         </div>
