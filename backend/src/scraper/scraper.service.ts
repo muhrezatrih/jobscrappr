@@ -11,8 +11,6 @@ export interface EvaluatedScrapedJob extends ScrapedJobItem {
   skillGaps: string[];
   recommendation: 'STRONG_MATCH' | 'GOOD_MATCH' | 'POTENTIAL_GAP' | 'LOW_FIT';
   workArrangement?: 'REMOTE' | 'HYBRID' | 'ONSITE';
-  salaryFit?: 'MEETS_TARGET' | 'REMOTE_MATCH' | 'UNDISCLOSED_ESTIMATED' | 'BELOW_TARGET';
-  estimatedSalaryRange?: string;
   trackedStatus?: string | null;
   trackedApplicationId?: string | null;
 }
@@ -171,8 +169,6 @@ export class ScraperService {
           skillGaps: evalResult.skillGaps || [],
           recommendation,
           workArrangement: evalResult.workArrangement || fallbackArrangement,
-          salaryFit: evalResult.salaryFit || (isRemoteLoc ? 'REMOTE_MATCH' : 'UNDISCLOSED_ESTIMATED'),
-          estimatedSalaryRange: evalResult.estimatedSalaryRange,
           trackedStatus: tracked ? tracked.status : null,
           trackedApplicationId: tracked ? tracked.id : null,
         };

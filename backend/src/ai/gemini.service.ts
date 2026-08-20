@@ -35,8 +35,6 @@ export interface JobMatchResult {
   skillGaps: string[];
   shouldApply: boolean;
   workArrangement?: 'REMOTE' | 'HYBRID' | 'ONSITE';
-  salaryFit?: 'MEETS_TARGET' | 'REMOTE_MATCH' | 'UNDISCLOSED_ESTIMATED' | 'BELOW_TARGET';
-  estimatedSalaryRange?: string;
 }
 
 export interface ScreeningAnswer {
@@ -51,65 +49,65 @@ export class GeminiService {
   private genAI: GoogleGenerativeAI;
   private modelName = 'gemini-flash-lite-latest';
 
-  constructor(private config?: ConfigService) {
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    this.modelName = this.config?.get<string>('GEMINI_MODEL') || process.env.GEMINI_MODEL || 'gemini-flash-lite-latest';
-    this.genAI = new GoogleGenerativeAI(apiKey);
-    this.logger.log(`Initialized GeminiService with model: ${this.modelName}`);
+  constructor(private configService?: ConfigService) {
+    const apiKey =
+      this.configService?.get<string>('GEMINI_API_KEY') || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      this.logger.warn(
+        'GEMINI_API_KEY environment variable is not configured. AI functions will use fallback logic.',
+      );
+    } else {
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.logger.log(`Initialized GeminiService with model: ${this.modelName}`);
+    }
   }
 
   private cleanJson(text: string): string {
-    let cleaned = text.trim();
-    if (cleaned.startsWith('```json')) {
-      cleaned = cleaned.substring(7);
-    } else if (cleaned.startsWith('```')) {
-      cleaned = cleaned.substring(3);
-    }
-    if (cleaned.endsWith('```')) {
-      cleaned = cleaned.substring(0, cleaned.length - 3);
-    }
-    return cleaned.trim();
+    return text
+      .replace(/```json/g, '')
+      .replace(/```/g, '')
+      .trim();
   }
 
   async extractResumeFromText(rawText: string): Promise<ExtractedProfile> {
     try {
       const model = this.genAI.getGenerativeModel({ model: this.modelName });
       const prompt = `
-You are an expert HR and Executive Tech Recruiter.
-Analyze the following raw resume text and extract all relevant candidate information into a strictly valid JSON object.
+You are an expert HR and Talent Acquisition AI analyzing a candidate resume.
+Parse and extract the following candidate details into a clean JSON structure in English:
 
-RAW RESUME TEXT:
+Resume Text:
 ${rawText}
 
-OUTPUT FORMAT (JSON ONLY, NO MARKDOWN, NO EXPLANATION):
+OUTPUT FORMAT (JSON ONLY):
 {
-  "fullName": "Full Name",
-  "email": "candidate@email.com",
-  "phone": "08123456789",
-  "location": "City, Country",
-  "headline": "Professional Title / Headline",
-  "summary": "Professional Summary (2-3 sentences)",
-  "skills": ["Skill 1", "Skill 2", "Skill 3"],
+  "fullName": "string",
+  "email": "string",
+  "phone": "string",
+  "location": "string",
+  "headline": "string (e.g. Senior Fullstack Engineer)",
+  "summary": "string (concise professional summary)",
+  "skills": ["string", "string"],
   "experiences": [
     {
-      "company": "Company Name",
-      "title": "Role / Position",
-      "duration": "Start - End Date (e.g. Jan 2022 - Present)",
-      "location": "City / Remote",
-      "description": "Overview of responsibilities",
-      "achievements": ["Key achievement 1", "Key achievement 2"]
+      "company": "string",
+      "title": "string",
+      "duration": "string",
+      "location": "string",
+      "description": "string",
+      "achievements": ["string"]
     }
   ],
   "education": [
     {
-      "institution": "University / College",
-      "degree": "Bachelor of Science",
-      "field": "Computer Science",
-      "graduationYear": "2023"
+      "institution": "string",
+      "degree": "string",
+      "field": "string",
+      "graduationYear": "string"
     }
   ],
-  "suggestedTargetRoles": ["Frontend Developer", "Fullstack Engineer", "Software Engineer"],
-  "suggestedKeywords": ["React", "TypeScript", "Next.js", "Node.js"]
+  "suggestedTargetRoles": ["string"],
+  "suggestedKeywords": ["string"]
 }
 `;
 
@@ -119,14 +117,12 @@ OUTPUT FORMAT (JSON ONLY, NO MARKDOWN, NO EXPLANATION):
       return JSON.parse(jsonStr) as ExtractedProfile;
     } catch (error) {
       this.logger.error(`Error extracting resume with Gemini: ${error.message}`);
-      // Fallback parser if API fails
       return {
-        fullName: 'Candidate Profile',
-        summary: rawText.slice(0, 300),
-        skills: ['Software Engineering', 'Problem Solving'],
+        fullName: 'Candidate',
+        skills: ['TypeScript', 'Node.js', 'React', 'PostgreSQL', 'REST API'],
         experiences: [],
         education: [],
-        suggestedTargetRoles: ['Software Developer'],
+        suggestedTargetRoles: ['Software Engineer', 'Backend Developer', 'Frontend Developer'],
       };
     }
   }
@@ -140,7 +136,7 @@ OUTPUT FORMAT (JSON ONLY, NO MARKDOWN, NO EXPLANATION):
       requirements?: string;
     },
     candidate: any,
-    preference: any,
+    preference?: any,
   ): Promise<JobMatchResult> {
     try {
       const model = this.genAI.getGenerativeModel({ model: this.modelName });
@@ -162,27 +158,24 @@ Summary: ${candidate.summary || ''}
 Skills: ${JSON.stringify(candidate.skills || [])}
 Experiences: ${JSON.stringify(candidate.experiences || [])}
 
-CANDIDATE PREFERENCES & COMPENSATION RULES:
+CANDIDATE PREFERENCES:
 - Target Roles: ${JSON.stringify(preference?.targetRoles || [])}
 - Target Locations: ${JSON.stringify(preference?.targetLocations || [])}
-- Work Arrangement Preference: PREFERS REMOTE. Open to Hybrid/Onsite ONLY IF Salary >= 20,000,000 IDR (Rp 20M/month).
+- Work Arrangement Preference: Prefers Remote, open to Hybrid/Onsite.
 
 EVALUATION & SCORING RULES:
-1. Work Arrangement & Salary Classification Rules (STRICT):
+1. Work Arrangement Classification (STRICT):
    - Examine title, location, and description carefully:
-     * Set workArrangement="REMOTE" and salaryFit="REMOTE_MATCH" ONLY IF the job explicitly mentions 100% remote, remote work, WFH, or location is explicitly "Remote". Include "🌐 Remote Work Preferred" in strengths.
+     * Set workArrangement="REMOTE" ONLY IF the job explicitly mentions 100% remote, remote work, WFH, or location is explicitly "Remote". Include "🌐 Remote Work Preferred" in strengths.
      * Set workArrangement="HYBRID" IF the job mentions hybrid or partial office / WFH.
      * Set workArrangement="ONSITE" IF the job specifies "On-site", "Onsite", "WFO", or has a physical city office location without explicit remote option. Do NOT classify physical office roles as REMOTE!
-   - For HYBRID or ONSITE roles:
-     * If published salary is >= 20,000,000 IDR: Reward high score and include "💰 Meets Salary Target (>= 20M IDR)" in strengths. Set salaryFit="MEETS_TARGET".
-     * If salary is UNDISCLOSED: Estimate based on company seniority/tier. If estimated >= 20M, score normally (75-90%) and add "✨ Estimated >= 20M (Verify in HR call)". Set salaryFit="UNDISCLOSED_ESTIMATED".
-     * If published salary is < 20,000,000 IDR: Apply a 15-25 point score penalty and add "⚠️ Below 20M Target for Onsite/Hybrid" in skillGaps. Set salaryFit="BELOW_TARGET".
 2. Technical Skills Fit:
-   - Check matching languages, databases, and system design experience.
-3. List 2-4 strong points of the candidate.
-4. List 1-3 minor skill gaps or keywords if any.
-5. Provide a crisp 2-sentence rationale in English.
-6. Set shouldApply = true if matchScore >= ${preference?.matchThreshold || 70} AND (workArrangement == "REMOTE" OR salaryFit != "BELOW_TARGET").
+   - Check matching languages (Golang, PHP, Node.js, TypeScript), databases (PostgreSQL, MySQL, Redis), and system design experience.
+3. Calculate Match Score (0-100) based purely on skill alignment, seniority, and technical qualification.
+4. List 2-4 strong points of the candidate.
+5. List 1-3 minor skill gaps or keywords if any.
+6. Provide a crisp 2-sentence rationale in English.
+7. Set shouldApply = true if matchScore >= ${preference?.matchThreshold || 70}.
 
 OUTPUT FORMAT (JSON ONLY):
 {
@@ -191,8 +184,6 @@ OUTPUT FORMAT (JSON ONLY):
   "strengths": ["6+ years backend engineering expertise", "Experience with scalable microservices"],
   "skillGaps": ["GCP Cloud deployment not highlighted"],
   "workArrangement": "ONSITE",
-  "salaryFit": "UNDISCLOSED_ESTIMATED",
-  "estimatedSalaryRange": "Rp 25.000.000 - Rp 35.000.000",
   "shouldApply": true
 }
 `;
@@ -222,7 +213,6 @@ OUTPUT FORMAT (JSON ONLY):
         strengths: ['Relevant backend engineering background'],
         skillGaps: [],
         workArrangement,
-        salaryFit: isRemoteLoc ? 'REMOTE_MATCH' : 'UNDISCLOSED_ESTIMATED',
         shouldApply: true,
       };
     }
