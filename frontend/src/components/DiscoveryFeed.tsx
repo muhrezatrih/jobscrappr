@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { EvaluatedScrapedJob, api, JobApplication } from '@/lib/api';
 import FormattedJobDescription from './FormattedJobDescription';
 import {
@@ -19,6 +19,8 @@ import {
   FileText,
   X,
   Copy,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
   CheckCircle2,
@@ -45,9 +47,13 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
 
-  // Modal and accordion state
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(8);
+  const feedTopRef = useRef<HTMLDivElement>(null);
+
+  // Modal and details state
   const [selectedJob, setSelectedJob] = useState<EvaluatedScrapedJob | null>(null);
-  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   // Load previously stored matching jobs on mount so user doesn't lose matches
@@ -75,6 +81,11 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Reset to page 1 whenever search results or filter pills change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [workFilter, jobs.length]);
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setIsLoading(true);
@@ -92,6 +103,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
         past24Hours,
       });
       setJobs(results);
+      setCurrentPage(1);
     } catch (err) {
       console.error('Failed to search and scrape jobs:', err);
     } finally {
@@ -196,8 +208,24 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
     (j) => j.trackedStatus !== 'APPLIED' && j.trackedStatus !== 'SKIPPED',
   ).length;
 
+  // Derived Pagination Calculations
+  const totalJobs = filteredJobs.length;
+  const totalPages = Math.max(1, Math.ceil(totalJobs / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, totalJobs);
+  const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    if (feedTopRef.current) {
+      feedTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
-    <div className="w-full flex flex-col space-y-6">
+    <div className="w-full flex flex-col space-y-6" ref={feedTopRef}>
       {/* Search Header & Filter Controls */}
       <form
         onSubmit={handleSearch}
@@ -349,7 +377,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
           </div>
 
           <span className="text-xs text-zinc-400">
-            Showing {filteredJobs.length} of {jobs.length} unique postings
+            Showing {totalJobs > 0 ? startIndex + 1 : 0}–{endIndex} of {totalJobs} results
           </span>
         </div>
       )}
@@ -371,14 +399,13 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       )}
 
       {/* Jobs Feed Grid */}
-      {!isLoading && filteredJobs.length > 0 && (
+      {!isLoading && paginatedJobs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filteredJobs.map((job) => {
+          {paginatedJobs.map((job) => {
             const isApplied = job.trackedStatus === 'APPLIED';
             const isSkipped = job.trackedStatus === 'SKIPPED';
             const isRemote = job.workArrangement === 'REMOTE';
             const isHybrid = job.workArrangement === 'HYBRID';
-            const isExpanded = expandedCardId === job.jobId;
 
             return (
               <div
@@ -571,6 +598,86 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Pagination Bar */}
+      {!isLoading && totalJobs > 0 && (
+        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-4 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-medium">
+          {/* Left Info & Page Size */}
+          <div className="flex items-center space-x-3 text-zinc-500 dark:text-zinc-400">
+            <span>
+              Showing <strong className="text-zinc-900 dark:text-zinc-100">{startIndex + 1}</strong>–<strong className="text-zinc-900 dark:text-zinc-100">{endIndex}</strong> of <strong className="text-zinc-900 dark:text-zinc-100">{totalJobs}</strong> jobs
+            </span>
+            <span className="text-zinc-300 dark:text-zinc-700">|</span>
+            <div className="flex items-center space-x-1.5">
+              <span>Per page:</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 px-2.5 py-1 rounded-xl border border-zinc-200 dark:border-zinc-700 font-semibold focus:outline-none cursor-pointer"
+              >
+                <option value={6}>6</option>
+                <option value={8}>8</option>
+                <option value={12}>12</option>
+                <option value={20}>20</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Page Navigation Buttons */}
+          <div className="flex items-center space-x-1.5">
+            <button
+              type="button"
+              onClick={() => handlePageChange(safeCurrentPage - 1)}
+              disabled={safeCurrentPage === 1}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Prev</span>
+            </button>
+
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => {
+                return p === 1 || p === totalPages || Math.abs(p - safeCurrentPage) <= 1;
+              })
+              .map((p, idx, arr) => {
+                const prevPage = arr[idx - 1];
+                const showEllipsis = prevPage && p - prevPage > 1;
+
+                return (
+                  <React.Fragment key={p}>
+                    {showEllipsis && (
+                      <span className="px-1 text-zinc-400">...</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handlePageChange(p)}
+                      className={`min-w-8 h-8 px-2.5 rounded-xl font-bold transition-all ${
+                        safeCurrentPage === p
+                          ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  </React.Fragment>
+                );
+              })}
+
+            <button
+              type="button"
+              onClick={() => handlePageChange(safeCurrentPage + 1)}
+              disabled={safeCurrentPage === totalPages}
+              className="flex items-center space-x-1 px-3 py-1.5 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <span>Next</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
