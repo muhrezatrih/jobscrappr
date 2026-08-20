@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import Link from 'next/link';
 import { SankeyAnalyticsResponse } from '@/lib/api';
-import { Sparkles, ArrowRight, Download } from 'lucide-react';
+import { Sparkles, ArrowRight, TrendingUp, Search } from 'lucide-react';
 
 interface SankeyDiagramProps {
   data: SankeyAnalyticsResponse;
@@ -10,26 +11,12 @@ interface SankeyDiagramProps {
   showMetrics?: boolean;
 }
 
-interface ComputedNode {
-  id: string;
-  label: string;
-  count: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  ribbonColor: string;
-  bgCardColor?: string;
-  borderCardColor?: string;
-  textAnchor?: 'left' | 'right' | 'inside';
-}
-
 export default function SankeyDiagram({ data, height = 620, showMetrics = true }: SankeyDiagramProps) {
   const [hoveredLink, setHoveredLink] = useState<{ source: string; target: string; value: number } | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
   const { links, conversionRates, totals } = data;
+  const hasData = totals.applied > 0;
 
   const width = 1000;
   const svgHeight = 640;
@@ -61,7 +48,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 180,
       width: 12,
       height: 250,
-      count: totals.applied || 9,
+      count: totals.applied,
       textPosition: 'left',
     },
     '1st_Interviews': {
@@ -74,7 +61,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 150,
       width: 12,
       height: 110,
-      count: totals.firstInterviews || 4,
+      count: totals.firstInterviews,
       textPosition: 'right',
     },
     Rejected: {
@@ -87,7 +74,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 310,
       width: 12,
       height: 80,
-      count: totals.rejected || 3,
+      count: totals.rejected,
       textPosition: 'right',
     },
     No_Reply: {
@@ -100,7 +87,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 450,
       width: 12,
       height: 55,
-      count: totals.noReply || 2,
+      count: totals.noReply,
       textPosition: 'right',
     },
     '2nd_Interviews': {
@@ -113,7 +100,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 110,
       width: 180,
       height: 55,
-      count: totals.secondInterviews || 2,
+      count: totals.secondInterviews,
       textPosition: 'inside',
     },
     Dropped_By_Myself: {
@@ -126,7 +113,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 220,
       width: 12,
       height: 30,
-      count: totals.dropped || 1,
+      count: totals.dropped,
       textPosition: 'right',
     },
     No_Offer_Received: {
@@ -139,7 +126,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 310,
       width: 12,
       height: 30,
-      count: totals.noOffer || 1,
+      count: totals.noOffer,
       textPosition: 'right',
     },
     Offers: {
@@ -152,7 +139,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 110,
       width: 120,
       height: 55,
-      count: totals.offers || 2,
+      count: totals.offers,
       textPosition: 'inside',
     },
     Accepted: {
@@ -165,7 +152,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 85,
       width: 12,
       height: 30,
-      count: totals.accepted || 1,
+      count: totals.accepted,
       textPosition: 'right',
     },
     Declined: {
@@ -178,7 +165,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
       y: 155,
       width: 12,
       height: 30,
-      count: totals.declined || 1,
+      count: totals.declined,
       textPosition: 'right',
     },
   };
@@ -188,9 +175,8 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: 'Applications',
       target: '1st_Interviews',
-      value: totals.firstInterviews || 4,
+      value: totals.firstInterviews,
       color: '#b0bec5',
-      // Applications top segment to 1st_Interviews
       y0: 180,
       h0: 110,
       y1: 150,
@@ -199,9 +185,8 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: 'Applications',
       target: 'Rejected',
-      value: totals.rejected || 3,
+      value: totals.rejected,
       color: '#dce775',
-      // Applications middle segment to Rejected
       y0: 290,
       h0: 80,
       y1: 310,
@@ -210,9 +195,8 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: 'Applications',
       target: 'No_Reply',
-      value: totals.noReply || 2,
+      value: totals.noReply,
       color: '#80deea',
-      // Applications bottom segment to No Reply
       y0: 370,
       h0: 60,
       y1: 450,
@@ -221,7 +205,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: '1st_Interviews',
       target: '2nd_Interviews',
-      value: totals.secondInterviews || 2,
+      value: totals.secondInterviews,
       color: '#90caf9',
       y0: 150,
       h0: 55,
@@ -231,7 +215,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: '1st_Interviews',
       target: 'Dropped_By_Myself',
-      value: totals.dropped || 1,
+      value: totals.dropped,
       color: '#ffcc80',
       y0: 205,
       h0: 28,
@@ -241,7 +225,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: '1st_Interviews',
       target: 'No_Offer_Received',
-      value: totals.noOffer || 1,
+      value: totals.noOffer,
       color: '#80deea',
       y0: 233,
       h0: 27,
@@ -251,7 +235,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: '2nd_Interviews',
       target: 'Offers',
-      value: totals.offers || 2,
+      value: totals.offers,
       color: '#a5d6a7',
       y0: 110,
       h0: 55,
@@ -262,7 +246,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: 'Offers',
       target: 'Accepted',
-      value: totals.accepted || 1,
+      value: totals.accepted,
       color: '#ef9a9a',
       y0: 110,
       h0: 28,
@@ -272,14 +256,14 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
     {
       source: 'Offers',
       target: 'Declined',
-      value: totals.declined || 1,
+      value: totals.declined,
       color: '#b39ddb',
       y0: 138,
       h0: 27,
       y1: 155,
       h1: 27,
     },
-  ];
+  ].filter((f) => f.value > 0);
 
   return (
     <div className="w-full flex flex-col space-y-6">
@@ -311,7 +295,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
                 {conversionRates.screeningTo2nd}%
               </span>
               <span className="text-xs text-emerald-500 font-medium">
-                ({totals.secondInterviews}/{totals.firstInterviews || 1})
+                ({totals.secondInterviews}/{totals.firstInterviews || (hasData ? 0 : 0)})
               </span>
             </div>
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -329,7 +313,7 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
                 {conversionRates.secondToOffer}%
               </span>
               <span className="text-xs text-purple-400 font-medium">
-                ({totals.offers}/{totals.secondInterviews || 1})
+                ({totals.offers}/{totals.secondInterviews || (hasData ? 0 : 0)})
               </span>
             </div>
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -362,195 +346,219 @@ export default function SankeyDiagram({ data, height = 620, showMetrics = true }
         </div>
       )}
 
-      {/* SVG Canvas Styled Exact like SlideModel */}
-      <div className="relative bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200/90 dark:border-zinc-800 shadow-sm overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${width} ${svgHeight}`}
-          className="w-full h-auto min-w-[760px] select-none font-sans"
-          style={{ maxHeight: `${height}px` }}
-        >
-          {/* S-Curve Ribbons (Links) */}
-          {linkFlows.map((flow, idx) => {
-            const srcNode = nodeDefs[flow.source];
-            const tgtNode = nodeDefs[flow.target];
-            if (!srcNode || !tgtNode) return null;
+      {/* Main Canvas Area */}
+      {!hasData ? (
+        /* Clean Empty State when 0 applications tracked */
+        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl rounded-3xl p-12 border border-zinc-200/90 dark:border-zinc-800 shadow-sm text-center flex flex-col items-center justify-center space-y-4">
+          <div className="p-4 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 rounded-3xl">
+            <TrendingUp className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+              No Application Flow Data Yet
+            </h4>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md">
+              Start by searching 24h backend jobs in the Discovery feed. Once you apply and track roles, your recruitment funnel and drop-off velocity will render live here.
+            </p>
+          </div>
+          <Link
+            href="/"
+            className="flex items-center space-x-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Search Fresh Jobs</span>
+          </Link>
+        </div>
+      ) : (
+        /* SVG Canvas Styled Exact like SlideModel */
+        <div className="relative bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200/90 dark:border-zinc-800 shadow-sm overflow-x-auto">
+          <svg
+            viewBox={`0 0 ${width} ${svgHeight}`}
+            className="w-full h-auto min-w-[760px] select-none font-sans"
+            style={{ maxHeight: `${height}px` }}
+          >
+            {/* S-Curve Ribbons (Links) */}
+            {linkFlows.map((flow, idx) => {
+              const srcNode = nodeDefs[flow.source];
+              const tgtNode = nodeDefs[flow.target];
+              if (!srcNode || !tgtNode) return null;
 
-            const x0 = srcNode.x + srcNode.width;
-            const x1 = tgtNode.x;
-            const xi = (x0 + x1) / 2;
+              const x0 = srcNode.x + srcNode.width;
+              const x1 = tgtNode.x;
+              const xi = (x0 + x1) / 2;
 
-            const y0 = flow.y0;
-            const y1 = flow.y1;
-            const h0 = flow.h0;
-            const h1 = flow.h1;
+              const y0 = flow.y0;
+              const y1 = flow.y1;
+              const h0 = flow.h0;
+              const h1 = flow.h1;
 
-            let path = '';
-            if (flow.isStraight) {
-              // Direct straight connection (like 2nd Interviews -> Offers in reference image)
-              path = `M ${x0},${y0} L ${x1},${y1} L ${x1},${y1 + h1} L ${x0},${y0 + h0} Z`;
-            } else {
-              path = `
-                M ${x0},${y0}
-                C ${xi},${y0} ${xi},${y1} ${x1},${y1}
-                L ${x1},${y1 + h1}
-                C ${xi},${y1 + h1} ${xi},${y0 + h0} ${x0},${y0 + h0}
-                Z
-              `;
-            }
+              let path = '';
+              if (flow.isStraight) {
+                path = `M ${x0},${y0} L ${x1},${y1} L ${x1},${y1 + h1} L ${x0},${y0 + h0} Z`;
+              } else {
+                path = `
+                  M ${x0},${y0}
+                  C ${xi},${y0} ${xi},${y1} ${x1},${y1}
+                  L ${x1},${y1 + h1}
+                  C ${xi},${y1 + h1} ${xi},${y0 + h0} ${x0},${y0 + h0}
+                  Z
+                `;
+              }
 
-            const isHovered =
-              hoveredLink?.source === flow.source && hoveredLink?.target === flow.target;
-            const isRelated =
-              hoveredNode === flow.source || hoveredNode === flow.target;
+              const isHovered =
+                hoveredLink?.source === flow.source && hoveredLink?.target === flow.target;
+              const isRelated =
+                hoveredNode === flow.source || hoveredNode === flow.target;
 
-            return (
-              <path
-                key={`flow-${idx}`}
-                d={path}
-                fill={flow.color}
-                opacity={isHovered ? 0.95 : isRelated ? 0.9 : 0.8}
-                className="transition-all duration-200 cursor-pointer hover:opacity-100"
-                onMouseEnter={() =>
-                  setHoveredLink({ source: flow.source, target: flow.target, value: flow.value })
-                }
-                onMouseLeave={() => setHoveredLink(null)}
-              />
-            );
-          })}
+              return (
+                <path
+                  key={`flow-${idx}`}
+                  d={path}
+                  fill={flow.color}
+                  opacity={isHovered ? 0.95 : isRelated ? 0.9 : 0.8}
+                  className="transition-all duration-200 cursor-pointer hover:opacity-100"
+                  onMouseEnter={() =>
+                    setHoveredLink({ source: flow.source, target: flow.target, value: flow.value })
+                  }
+                  onMouseLeave={() => setHoveredLink(null)}
+                />
+              );
+            })}
 
-          {/* Nodes & Card Headers */}
-          {Object.entries(nodeDefs).map(([nodeId, node]) => {
-            const isHovered = hoveredNode === nodeId;
-            const isTargetOfHover =
-              hoveredLink?.target === nodeId || hoveredLink?.source === nodeId;
+            {/* Nodes & Card Headers */}
+            {Object.entries(nodeDefs).map(([nodeId, node]) => {
+              const isHovered = hoveredNode === nodeId;
+              const isTargetOfHover =
+                hoveredLink?.target === nodeId || hoveredLink?.source === nodeId;
 
-            return (
-              <g
-                key={`node-${nodeId}`}
-                className="cursor-pointer transition-all duration-200"
-                onMouseEnter={() => setHoveredNode(nodeId)}
-                onMouseLeave={() => setHoveredNode(null)}
-              >
-                {/* 1. Large Rounded Card Background (if inside text position like 2nd Interviews or Offers) */}
-                {node.textPosition === 'inside' && (
+              return (
+                <g
+                  key={`node-${nodeId}`}
+                  className="cursor-pointer transition-all duration-200"
+                  onMouseEnter={() => setHoveredNode(nodeId)}
+                  onMouseLeave={() => setHoveredNode(null)}
+                >
+                  {/* 1. Large Rounded Card Background (if inside text position like 2nd Interviews or Offers) */}
+                  {node.textPosition === 'inside' && (
+                    <rect
+                      x={node.x}
+                      y={node.y}
+                      width={node.width}
+                      height={node.height}
+                      rx={10}
+                      fill={node.bgCardColor}
+                      stroke={node.borderCardColor}
+                      strokeWidth={1.5}
+                      className="transition-all duration-200"
+                    />
+                  )}
+
+                  {/* 2. Left Edge Vertical Solid Bar */}
                   <rect
                     x={node.x}
                     y={node.y}
-                    width={node.width}
+                    width={node.textPosition === 'inside' ? 8 : node.width}
                     height={node.height}
-                    rx={10}
-                    fill={node.bgCardColor}
-                    stroke={node.borderCardColor}
-                    strokeWidth={1.5}
-                    className="transition-all duration-200"
-                  />
-                )}
-
-                {/* 2. Left Edge Vertical Solid Bar */}
-                <rect
-                  x={node.x}
-                  y={node.y}
-                  width={node.textPosition === 'inside' ? 8 : node.width}
-                  height={node.height}
-                  rx={node.textPosition === 'inside' ? 4 : 4}
-                  fill={node.color}
-                  className={`transition-all duration-200 ${
-                    isHovered || isTargetOfHover ? 'filter drop-shadow(0 0 6px ' + node.color + ')' : ''
-                  }`}
-                />
-
-                {/* 3. Right Edge Solid Bar (for 2nd Interviews & Offers container blocks) */}
-                {node.textPosition === 'inside' && (
-                  <rect
-                    x={node.x + node.width - 8}
-                    y={node.y}
-                    width={8}
-                    height={node.height}
-                    rx={4}
+                    rx={node.textPosition === 'inside' ? 4 : 4}
                     fill={node.color}
+                    className={`transition-all duration-200 ${
+                      isHovered || isTargetOfHover ? 'filter drop-shadow(0 0 6px ' + node.color + ')' : ''
+                    }`}
                   />
-                )}
 
-                {/* 4. Labels & Bold Counts */}
-                {node.textPosition === 'left' && (
-                  <g>
-                    <text
-                      x={node.x - 12}
-                      y={node.y + node.height / 2 - 4}
-                      textAnchor="end"
-                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[20px]"
-                    >
-                      {node.count}
-                    </text>
-                    <text
-                      x={node.x - 12}
-                      y={node.y + node.height / 2 + 14}
-                      textAnchor="end"
-                      className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
-                    >
-                      {node.label}
-                    </text>
-                  </g>
-                )}
+                  {/* 3. Right Edge Solid Bar (for 2nd Interviews & Offers container blocks) */}
+                  {node.textPosition === 'inside' && (
+                    <rect
+                      x={node.x + node.width - 8}
+                      y={node.y}
+                      width={8}
+                      height={node.height}
+                      rx={4}
+                      fill={node.color}
+                    />
+                  )}
 
-                {node.textPosition === 'right' && (
-                  <g>
-                    <text
-                      x={node.x + node.width + 12}
-                      y={node.y + node.height / 2 - 4}
-                      textAnchor="start"
-                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
-                    >
-                      {node.count}
-                    </text>
-                    <text
-                      x={node.x + node.width + 12}
-                      y={node.y + node.height / 2 + 14}
-                      textAnchor="start"
-                      className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
-                    >
-                      {node.label}
-                    </text>
-                  </g>
-                )}
+                  {/* 4. Labels & Bold Counts */}
+                  {node.textPosition === 'left' && (
+                    <g>
+                      <text
+                        x={node.x - 12}
+                        y={node.y + node.height / 2 - 4}
+                        textAnchor="end"
+                        className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[20px]"
+                      >
+                        {node.count}
+                      </text>
+                      <text
+                        x={node.x - 12}
+                        y={node.y + node.height / 2 + 14}
+                        textAnchor="end"
+                        className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
+                      >
+                        {node.label}
+                      </text>
+                    </g>
+                  )}
 
-                {node.textPosition === 'inside' && (
-                  <g>
-                    <text
-                      x={node.x + 20}
-                      y={node.y + 24}
-                      textAnchor="start"
-                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
-                    >
-                      {node.count}
-                    </text>
-                    <text
-                      x={node.x + 20}
-                      y={node.y + 42}
-                      textAnchor="start"
-                      className="fill-zinc-700 dark:fill-zinc-300 font-semibold text-[12px]"
-                    >
-                      {node.label}
-                    </text>
-                  </g>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+                  {node.textPosition === 'right' && (
+                    <g>
+                      <text
+                        x={node.x + node.width + 12}
+                        y={node.y + node.height / 2 - 4}
+                        textAnchor="start"
+                        className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
+                      >
+                        {node.count}
+                      </text>
+                      <text
+                        x={node.x + node.width + 12}
+                        y={node.y + node.height / 2 + 14}
+                        textAnchor="start"
+                        className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
+                      >
+                        {node.label}
+                      </text>
+                    </g>
+                  )}
 
-        {/* Hover Tooltip */}
-        {hoveredLink && (
-          <div className="absolute bottom-6 left-8 bg-zinc-950/90 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl text-xs flex items-center space-x-2.5 shadow-2xl border border-zinc-800 animate-fadeIn">
-            <span className="font-semibold">{hoveredLink.source.replace(/_/g, ' ')}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="font-semibold">{hoveredLink.target.replace(/_/g, ' ')}</span>
-            <span className="bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded-md ml-2">
-              {hoveredLink.value} {hoveredLink.value === 1 ? 'application' : 'applications'}
-            </span>
-          </div>
-        )}
-      </div>
+                  {node.textPosition === 'inside' && (
+                    <g>
+                      <text
+                        x={node.x + 20}
+                        y={node.y + 24}
+                        textAnchor="start"
+                        className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
+                      >
+                        {node.count}
+                      </text>
+                      <text
+                        x={node.x + 20}
+                        y={node.y + 42}
+                        textAnchor="start"
+                        className="fill-zinc-700 dark:fill-zinc-300 font-semibold text-[12px]"
+                      >
+                        {node.label}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
+          </svg>
+
+          {/* Hover Tooltip */}
+          {hoveredLink && (
+            <div className="absolute bottom-6 left-8 bg-zinc-950/90 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl text-xs flex items-center space-x-2.5 shadow-2xl border border-zinc-800 animate-fadeIn">
+              <span className="font-semibold">{hoveredLink.source.replace(/_/g, ' ')}</span>
+              <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
+              <span className="font-semibold">{hoveredLink.target.replace(/_/g, ' ')}</span>
+              <span className="bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded-md ml-2">
+                {hoveredLink.value} {hoveredLink.value === 1 ? 'application' : 'applications'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -423,30 +423,6 @@ export class JobsService {
       }
     }
 
-    // Default sample flow demonstration if database has fewer than 3 applications
-    if (totalApplied < 3) {
-      linkCounts['Applications->1st_Interviews'] = 4;
-      linkCounts['Applications->Rejected'] = 3;
-      linkCounts['Applications->No_Reply'] = 2;
-      linkCounts['1st_Interviews->2nd_Interviews'] = 2;
-      linkCounts['1st_Interviews->Dropped_By_Myself'] = 1;
-      linkCounts['1st_Interviews->No_Offer_Received'] = 1;
-      linkCounts['2nd_Interviews->Offers'] = 2;
-      linkCounts['Offers->Accepted'] = 1;
-      linkCounts['Offers->Declined'] = 1;
-
-      totalApplied = 9;
-      total1st = 4;
-      totalRejected = 3;
-      totalNoReply = 2;
-      total2nd = 2;
-      totalDropped = 1;
-      totalNoOffer = 1;
-      totalOffers = 2;
-      totalAccepted = 1;
-      totalDeclined = 1;
-    }
-
     const links = Object.entries(linkCounts).map(([key, value]) => {
       const [source, target] = key.split('->');
       return { source, target, value };
