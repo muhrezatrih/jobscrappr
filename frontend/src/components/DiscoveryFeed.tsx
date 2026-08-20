@@ -17,11 +17,16 @@ import {
   ChevronDown,
   RefreshCw,
   Plus,
+  Globe,
+  Award,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface DiscoveryFeedProps {
   onJobTracked?: (app: JobApplication) => void;
 }
+
+type WorkFilterType = 'ALL' | 'REMOTE_ONLY' | 'TARGET_SALARY';
 
 export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [keywords, setKeywords] = useState('Backend Developer');
@@ -29,6 +34,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [useLinkedIn, setUseLinkedIn] = useState(true);
   const [useJobstreet, setUseJobstreet] = useState(true);
   const [past24Hours, setPast24Hours] = useState(true);
+  const [workFilter, setWorkFilter] = useState<WorkFilterType>('ALL');
 
   const [isLoading, setIsLoading] = useState(false);
   const [jobs, setJobs] = useState<EvaluatedScrapedJob[]>([]);
@@ -71,7 +77,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
         jobTitle: job.title,
         companyName: job.company,
         location: job.location,
-        salaryInfo: job.salary,
+        salaryInfo: job.salary || job.estimatedSalaryRange,
         jobUrl: job.jobUrl,
         portal: job.portal,
         jobDescription: job.description,
@@ -117,6 +123,25 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
     }
   };
 
+  // Filter jobs based on active quick-pill
+  const filteredJobs = jobs.filter((job) => {
+    const isRemote =
+      job.workArrangement === 'REMOTE' ||
+      job.location.toLowerCase().includes('remote') ||
+      job.title.toLowerCase().includes('remote');
+
+    if (workFilter === 'REMOTE_ONLY') {
+      return isRemote;
+    }
+
+    if (workFilter === 'TARGET_SALARY') {
+      // Meets >= 20M or is Remote
+      return isRemote || job.salaryFit === 'MEETS_TARGET' || job.salaryFit === 'UNDISCLOSED_ESTIMATED';
+    }
+
+    return true;
+  });
+
   return (
     <div className="w-full flex flex-col space-y-6">
       {/* Search Header & Filter Controls */}
@@ -155,7 +180,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             {isLoading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Scraping & Analyzing...</span>
+                <span>Scraping & Evaluating...</span>
               </>
             ) : (
               <>
@@ -166,7 +191,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
           </button>
         </div>
 
-        {/* Portal Badges & Filters */}
+        {/* Portal Badges & Preferences Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-100 dark:border-zinc-800/80 text-xs">
           <div className="flex items-center space-x-3">
             <span className="font-medium text-zinc-500 dark:text-zinc-400">Sources:</span>
@@ -192,27 +217,67 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
           </div>
 
           <div className="flex items-center space-x-2">
+            <span className="inline-flex items-center space-x-1 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300 px-3 py-1.5 rounded-xl font-bold">
+              <Globe className="w-3.5 h-3.5" />
+              <span>Remote Preferred • Hybrid/Onsite &ge; 20M IDR</span>
+            </span>
+
             <span className="inline-flex items-center space-x-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-xl font-bold">
               <Clock className="w-3.5 h-3.5" />
-              <span>Past 24 Hours Only</span>
+              <span>24h Only</span>
             </span>
           </div>
         </div>
       </form>
 
-      {/* Results Header */}
+      {/* Quick Filter Pills (Remote vs >= 20M) */}
       {hasSearched && (
-        <div className="flex items-center justify-between px-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
           <div className="flex items-center space-x-2">
-            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-              Scraped & AI-Evaluated Jobs
-            </h3>
-            <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
-              {jobs.length} found
+            <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider mr-1">
+              Filter View:
             </span>
+            <button
+              type="button"
+              onClick={() => setWorkFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                workFilter === 'ALL'
+                  ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 shadow-sm'
+                  : 'bg-white dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              All Matches ({jobs.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWorkFilter('REMOTE_ONLY')}
+              className={`flex items-center space-x-1 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                workFilter === 'REMOTE_ONLY'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>Remote Only</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWorkFilter('TARGET_SALARY')}
+              className={`flex items-center space-x-1 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                workFilter === 'TARGET_SALARY'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>&ge; 20M IDR or Remote</span>
+            </button>
           </div>
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            Sorted by AI Candidate Match Score
+
+          <span className="text-xs text-zinc-400">
+            Showing {filteredJobs.length} of {jobs.length} postings
           </span>
         </div>
       )}
@@ -234,10 +299,14 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       )}
 
       {/* Jobs Feed Grid */}
-      {!isLoading && jobs.length > 0 && (
+      {!isLoading && filteredJobs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {jobs.map((job) => {
+          {filteredJobs.map((job) => {
             const isTracked = !!job.trackedStatus;
+            const isRemote =
+              job.workArrangement === 'REMOTE' ||
+              job.location.toLowerCase().includes('remote') ||
+              job.title.toLowerCase().includes('remote');
 
             return (
               <div
@@ -248,9 +317,9 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                     : 'border-zinc-200/90 dark:border-zinc-800 hover:border-blue-500/40'
                 }`}
               >
-                {/* Top Bar: Portal + AI Match Score Badge */}
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-2">
+                {/* Top Bar: Portal + Location/Salary Badges + AI Fit Score */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span
                       className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider ${
                         job.portal === 'LINKEDIN'
@@ -260,15 +329,45 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                     >
                       {job.portal}
                     </span>
-                    <span className="text-xs text-zinc-400 flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
-                      <span>{job.postedAt || 'Past 24h'}</span>
-                    </span>
+
+                    {/* Remote vs Hybrid/Onsite Tag */}
+                    {isRemote ? (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                        <Globe className="w-3 h-3" />
+                        <span>Remote</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                        <Building2 className="w-3 h-3" />
+                        <span>{job.workArrangement || 'Hybrid/Onsite'}</span>
+                      </span>
+                    )}
+
+                    {/* Compensation Fit Tag */}
+                    {job.salaryFit === 'MEETS_TARGET' && (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                        <Award className="w-3 h-3" />
+                        <span>&ge; 20M Target</span>
+                      </span>
+                    )}
+
+                    {job.salaryFit === 'UNDISCLOSED_ESTIMATED' && (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                        <span>✨ Est. &ge; 20M</span>
+                      </span>
+                    )}
+
+                    {job.salaryFit === 'BELOW_TARGET' && (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                        <AlertTriangle className="w-3 h-3" />
+                        <span>&lt; 20M Target</span>
+                      </span>
+                    )}
                   </div>
 
                   {/* Glowing AI Fit Score Badge */}
                   <div
-                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-extrabold border ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-extrabold border flex-shrink-0 ${
                       job.matchScore >= 80
                         ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700'
                         : job.matchScore >= 60
@@ -296,14 +395,21 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                       <MapPin className="w-3.5 h-3.5" />
                       <span>{job.location}</span>
                     </span>
+                    <span>•</span>
+                    <span className="flex items-center space-x-1">
+                      <Clock className="w-3 h-3" />
+                      <span>{job.postedAt || 'Past 24h'}</span>
+                    </span>
                   </div>
                 </div>
 
                 {/* Salary Info if available */}
-                {job.salary && (
+                {(job.salary || job.estimatedSalaryRange) && (
                   <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center space-x-1 bg-emerald-50/50 dark:bg-emerald-950/30 px-3 py-1.5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/40">
                     <DollarSign className="w-3.5 h-3.5" />
-                    <span>{job.salary}</span>
+                    <span>
+                      {job.salary || `Estimated Range: ${job.estimatedSalaryRange}`}
+                    </span>
                   </div>
                 )}
 
@@ -327,7 +433,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                   )}
                 </div>
 
-                {/* Bottom Decision Action Buttons */}
+                {/* Bottom Action Footer */}
                 <div className="pt-2 flex items-center justify-between gap-2">
                   <a
                     href={job.jobUrl}
@@ -383,7 +489,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             Ready to find fresh backend jobs?
           </h4>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md">
-            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. Gemini AI will evaluate each description against your CV in real time.
+            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. Gemini AI will evaluate your CV and highlight Remote roles & compensation $\ge$ 20M IDR automatically.
           </p>
         </div>
       )}

@@ -34,6 +34,9 @@ export interface JobMatchResult {
   strengths: string[];
   skillGaps: string[];
   shouldApply: boolean;
+  workArrangement?: 'REMOTE' | 'HYBRID' | 'ONSITE';
+  salaryFit?: 'MEETS_TARGET' | 'REMOTE_MATCH' | 'UNDISCLOSED_ESTIMATED' | 'BELOW_TARGET';
+  estimatedSalaryRange?: string;
 }
 
 export interface ScreeningAnswer {
@@ -142,10 +145,9 @@ OUTPUT FORMAT (JSON ONLY, NO MARKDOWN, NO EXPLANATION):
     try {
       const model = this.genAI.getGenerativeModel({ model: this.modelName });
       const prompt = `
-You are an AI Job Matching Engine.
-Evaluate the compatibility between this Job Opportunity and the Candidate Profile based on skills, experience, and search preferences.
+You are an AI Job Matching Assistant evaluating a candidate's compatibility for an engineering job vacancy.
 
-JOB DETAILS:
+JOB VACANCY:
 Title: ${job.title}
 Company: ${job.company}
 Location: ${job.location || 'N/A'}
@@ -160,25 +162,34 @@ Summary: ${candidate.summary || ''}
 Skills: ${JSON.stringify(candidate.skills || [])}
 Experiences: ${JSON.stringify(candidate.experiences || [])}
 
-PREFERENCES:
-Target Roles: ${JSON.stringify(preference?.targetRoles || [])}
-Target Locations: ${JSON.stringify(preference?.targetLocations || [])}
-Min Match Threshold: ${preference?.matchThreshold || 70}%
+CANDIDATE PREFERENCES & COMPENSATION RULES:
+- Target Roles: ${JSON.stringify(preference?.targetRoles || [])}
+- Target Locations: ${JSON.stringify(preference?.targetLocations || [])}
+- Work Arrangement Preference: PREFERS REMOTE. Open to Hybrid/Onsite ONLY IF Salary >= 20,000,000 IDR (Rp 20M/month).
 
-EVALUATION RULES:
-1. Calculate a realistic Match Score from 0 to 100.
-2. If role is completely unrelated (e.g. Sales vs Backend Developer), score < 50.
-3. List 2-4 strong points of the candidate for this specific role.
-4. List 1-3 minor skill gaps or missing keywords if any.
+EVALUATION & SCORING RULES:
+1. Work Arrangement & Salary Rules:
+   - If role is REMOTE (100% remote or remote option): Reward high compatibility score (85-100%) and include "🌐 Remote Work Preferred" in strengths. Set workArrangement="REMOTE", salaryFit="REMOTE_MATCH".
+   - If role is HYBRID or ONSITE:
+     * If published salary is >= 20,000,000 IDR: Reward high score and include "💰 Meets Salary Target (>= 20M IDR)" in strengths. Set salaryFit="MEETS_TARGET".
+     * If salary is UNDISCLOSED: Estimate based on company seniority/tier. If estimated >= 20M, score normally (75-90%) and add "✨ Estimated >= 20M (Verify in HR call)". Set salaryFit="UNDISCLOSED_ESTIMATED".
+     * If published salary is < 20,000,000 IDR: Apply a 15-25 point score penalty and add "⚠️ Below 20M Target for Onsite/Hybrid" in skillGaps. Set salaryFit="BELOW_TARGET".
+2. Technical Skills Fit:
+   - Check matching languages, databases, and system design experience.
+3. List 2-4 strong points of the candidate.
+4. List 1-3 minor skill gaps or keywords if any.
 5. Provide a crisp 2-sentence rationale in English.
-6. Set shouldApply = true ONLY if matchScore >= ${preference?.matchThreshold || 70}.
+6. Set shouldApply = true if matchScore >= ${preference?.matchThreshold || 70} AND (workArrangement == "REMOTE" OR salaryFit != "BELOW_TARGET").
 
 OUTPUT FORMAT (JSON ONLY):
 {
-  "matchScore": 85,
-  "matchReason": "The candidate has strong relevant experience in Next.js, TypeScript, and NestJS required for this role.",
-  "strengths": ["3+ years of React & TypeScript expertise", "Deep understanding of RESTful APIs and distributed systems"],
-  "skillGaps": ["AWS Cloud deployment was not explicitly highlighted"],
+  "matchScore": 88,
+  "matchReason": "Strong match for backend developer role with remote flexibility matching candidate technical stack.",
+  "strengths": ["6+ years backend engineering expertise", "🌐 Remote Work Preferred"],
+  "skillGaps": ["GCP Cloud deployment not highlighted"],
+  "workArrangement": "REMOTE",
+  "salaryFit": "REMOTE_MATCH",
+  "estimatedSalaryRange": "Rp 25.000.000 - Rp 35.000.000",
   "shouldApply": true
 }
 `;
@@ -195,6 +206,8 @@ OUTPUT FORMAT (JSON ONLY):
         strengths: ['Relevant core technical skills and engineering background'],
         skillGaps: [],
         shouldApply: true,
+        workArrangement: 'REMOTE',
+        salaryFit: 'REMOTE_MATCH'
       };
     }
   }

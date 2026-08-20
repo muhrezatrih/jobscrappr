@@ -106,6 +106,9 @@ export interface EvaluatedScrapedJob {
   strengths: string[];
   skillGaps: string[];
   recommendation: 'STRONG_MATCH' | 'GOOD_MATCH' | 'POTENTIAL_GAP' | 'LOW_FIT';
+  workArrangement?: 'REMOTE' | 'HYBRID' | 'ONSITE';
+  salaryFit?: 'MEETS_TARGET' | 'REMOTE_MATCH' | 'UNDISCLOSED_ESTIMATED' | 'BELOW_TARGET';
+  estimatedSalaryRange?: string;
   trackedStatus?: string | null;
   trackedApplicationId?: string | null;
 }
