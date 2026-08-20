@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { EvaluatedScrapedJob, api, JobApplication } from '@/lib/api';
+import FormattedJobDescription from './FormattedJobDescription';
 import {
   Search,
   Sparkles,
@@ -746,9 +747,10 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                   </button>
                 </div>
 
-                <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">
-                  {selectedJob.description || 'No detailed description provided by portal.'}
-                </div>
+                <FormattedJobDescription
+                  description={selectedJob.description}
+                  requirements={selectedJob.requirements}
+                />
               </div>
             </div>
 
