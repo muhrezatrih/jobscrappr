@@ -168,9 +168,12 @@ CANDIDATE PREFERENCES & COMPENSATION RULES:
 - Work Arrangement Preference: PREFERS REMOTE. Open to Hybrid/Onsite ONLY IF Salary >= 20,000,000 IDR (Rp 20M/month).
 
 EVALUATION & SCORING RULES:
-1. Work Arrangement & Salary Rules:
-   - If role is REMOTE (100% remote or remote option): Reward high compatibility score (85-100%) and include "🌐 Remote Work Preferred" in strengths. Set workArrangement="REMOTE", salaryFit="REMOTE_MATCH".
-   - If role is HYBRID or ONSITE:
+1. Work Arrangement & Salary Classification Rules (STRICT):
+   - Examine title, location, and description carefully:
+     * Set workArrangement="REMOTE" and salaryFit="REMOTE_MATCH" ONLY IF the job explicitly mentions 100% remote, remote work, WFH, or location is explicitly "Remote". Include "🌐 Remote Work Preferred" in strengths.
+     * Set workArrangement="HYBRID" IF the job mentions hybrid or partial office / WFH.
+     * Set workArrangement="ONSITE" IF the job specifies "On-site", "Onsite", "WFO", or has a physical city office location without explicit remote option. Do NOT classify physical office roles as REMOTE!
+   - For HYBRID or ONSITE roles:
      * If published salary is >= 20,000,000 IDR: Reward high score and include "💰 Meets Salary Target (>= 20M IDR)" in strengths. Set salaryFit="MEETS_TARGET".
      * If salary is UNDISCLOSED: Estimate based on company seniority/tier. If estimated >= 20M, score normally (75-90%) and add "✨ Estimated >= 20M (Verify in HR call)". Set salaryFit="UNDISCLOSED_ESTIMATED".
      * If published salary is < 20,000,000 IDR: Apply a 15-25 point score penalty and add "⚠️ Below 20M Target for Onsite/Hybrid" in skillGaps. Set salaryFit="BELOW_TARGET".
@@ -184,11 +187,11 @@ EVALUATION & SCORING RULES:
 OUTPUT FORMAT (JSON ONLY):
 {
   "matchScore": 88,
-  "matchReason": "Strong match for backend developer role with remote flexibility matching candidate technical stack.",
-  "strengths": ["6+ years backend engineering expertise", "🌐 Remote Work Preferred"],
+  "matchReason": "Strong match for backend developer role matching candidate technical stack in Golang and PostgreSQL.",
+  "strengths": ["6+ years backend engineering expertise", "Experience with scalable microservices"],
   "skillGaps": ["GCP Cloud deployment not highlighted"],
-  "workArrangement": "REMOTE",
-  "salaryFit": "REMOTE_MATCH",
+  "workArrangement": "ONSITE",
+  "salaryFit": "UNDISCLOSED_ESTIMATED",
   "estimatedSalaryRange": "Rp 25.000.000 - Rp 35.000.000",
   "shouldApply": true
 }
@@ -200,14 +203,27 @@ OUTPUT FORMAT (JSON ONLY):
       return JSON.parse(jsonStr) as JobMatchResult;
     } catch (error) {
       this.logger.error(`Error evaluating job match: ${error.message}`);
+      const isRemoteLoc =
+        (job.location || '').toLowerCase().includes('remote') ||
+        job.title.toLowerCase().includes('remote');
+      const isHybridLoc =
+        (job.location || '').toLowerCase().includes('hybrid') ||
+        job.title.toLowerCase().includes('hybrid');
+
+      const workArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
+        ? 'REMOTE'
+        : isHybridLoc
+        ? 'HYBRID'
+        : 'ONSITE';
+
       return {
-        matchScore: 75,
-        matchReason: 'Candidate demonstrates strong foundational skills matching the core requirements of this position.',
-        strengths: ['Relevant core technical skills and engineering background'],
+        matchScore: 80,
+        matchReason: 'Candidate demonstrates strong backend skills and experience relevant to this role.',
+        strengths: ['Relevant backend engineering background'],
         skillGaps: [],
+        workArrangement,
+        salaryFit: isRemoteLoc ? 'REMOTE_MATCH' : 'UNDISCLOSED_ESTIMATED',
         shouldApply: true,
-        workArrangement: 'REMOTE',
-        salaryFit: 'REMOTE_MATCH'
       };
     }
   }

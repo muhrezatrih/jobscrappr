@@ -94,7 +94,7 @@ export class LinkedinScraperService {
               jobUrl,
               portal: 'LINKEDIN',
               postedAt,
-              description: `Position: ${title} at ${company}. Posted recently on LinkedIn (${postedAt}). Location: ${loc}. Apply directly via LinkedIn posting.`,
+              description: `Position: ${title} at ${company}. Location: ${loc}. Posted recently on LinkedIn (${postedAt}).`,
             });
           }
         } catch (err) {
@@ -102,25 +102,73 @@ export class LinkedinScraperService {
         }
       }
 
-      this.logger.log(`Parsed ${jobs.length} valid LinkedIn job postings.`);
-      return jobs;
+      this.logger.log(`Parsed ${jobs.length} valid LinkedIn job postings. Fetching detailed descriptions...`);
+
+      // Fetch full descriptions and workplace details in parallel batches of 5
+      const jobsWithDetails = await Promise.all(
+        jobs.slice(0, 10).map(async (job) => {
+          try {
+            const detail = await this.fetchJobDetail(job.jobId);
+            if (detail) {
+              return {
+                ...job,
+                location: detail.workplaceType ? `${job.location} (${detail.workplaceType})` : job.location,
+                description: detail.description || job.description,
+              };
+            }
+            return job;
+          } catch {
+            return job;
+          }
+        }),
+      );
+
+      return jobsWithDetails;
     } catch (e) {
       this.logger.warn(`LinkedIn scrape failed or timed out: ${e.message}`);
       return [];
     }
   }
 
-  async fetchJobDescription(jobId: string): Promise<string> {
+  async fetchJobDetail(jobId: string): Promise<{ description: string; workplaceType?: 'REMOTE' | 'HYBRID' | 'ONSITE' } | null> {
     try {
       const detailUrl = `https://www.linkedin.com/jobs-guest/jobs/api/jobPosting/${jobId}`;
       const html = await this.fetchHtml(detailUrl);
       const descMatch = html.match(/<div[^>]*class="show-more-less-html__markup[^>]*>([\s\S]*?)<\/div>/i);
-      if (descMatch) {
-        return descMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      const fullText = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+
+      let workplaceType: 'REMOTE' | 'HYBRID' | 'ONSITE' | undefined = undefined;
+      const lower = fullText.toLowerCase();
+
+      if (lower.includes('remote') || lower.includes('work from home') || lower.includes('wfh')) {
+        if (!lower.includes('non-remote') && !lower.includes('not remote') && !lower.includes('no remote')) {
+          workplaceType = 'REMOTE';
+        }
       }
-      return '';
+      if (lower.includes('hybrid') || lower.includes('wfh & wfo') || lower.includes('wfo & wfh')) {
+        workplaceType = 'HYBRID';
+      }
+      if (lower.includes('on-site') || lower.includes('onsite') || lower.includes('work from office') || lower.includes('wfo full')) {
+        if (!workplaceType) {
+          workplaceType = 'ONSITE';
+        }
+      }
+
+      const description = descMatch
+        ? descMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+        : '';
+
+      return {
+        description: description || fullText.slice(0, 1500),
+        workplaceType,
+      };
     } catch {
-      return '';
+      return null;
     }
+  }
+
+  async fetchJobDescription(jobId: string): Promise<string> {
+    const detail = await this.fetchJobDetail(jobId);
+    return detail ? detail.description : '';
   }
 }

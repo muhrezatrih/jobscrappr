@@ -127,11 +127,11 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const filteredJobs = jobs.filter((job) => {
     const isRemote =
       job.workArrangement === 'REMOTE' ||
-      job.location.toLowerCase().includes('remote') ||
-      job.title.toLowerCase().includes('remote');
+      (job.location.toLowerCase().includes('remote') && job.workArrangement !== 'ONSITE') ||
+      (job.title.toLowerCase().includes('remote') && job.workArrangement !== 'ONSITE');
 
     if (workFilter === 'REMOTE_ONLY') {
-      return isRemote;
+      return isRemote && job.workArrangement !== 'ONSITE' && job.workArrangement !== 'HYBRID';
     }
 
     if (workFilter === 'TARGET_SALARY') {
@@ -303,10 +303,8 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredJobs.map((job) => {
             const isTracked = !!job.trackedStatus;
-            const isRemote =
-              job.workArrangement === 'REMOTE' ||
-              job.location.toLowerCase().includes('remote') ||
-              job.title.toLowerCase().includes('remote');
+            const isRemote = job.workArrangement === 'REMOTE';
+            const isHybrid = job.workArrangement === 'HYBRID';
 
             return (
               <div
@@ -330,16 +328,21 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                       {job.portal}
                     </span>
 
-                    {/* Remote vs Hybrid/Onsite Tag */}
+                    {/* Remote vs Hybrid vs On-site Tag */}
                     {isRemote ? (
                       <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
                         <Globe className="w-3 h-3" />
                         <span>Remote</span>
                       </span>
-                    ) : (
-                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                    ) : isHybrid ? (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                         <Building2 className="w-3 h-3" />
-                        <span>{job.workArrangement || 'Hybrid/Onsite'}</span>
+                        <span>Hybrid</span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                        <MapPin className="w-3 h-3" />
+                        <span>On-site</span>
                       </span>
                     )}
 

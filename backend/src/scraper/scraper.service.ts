@@ -150,6 +150,19 @@ export class ScraperService {
         else if (evalResult.matchScore >= 45) recommendation = 'POTENTIAL_GAP';
         else recommendation = 'LOW_FIT';
 
+        const isRemoteLoc =
+          (job.location || '').toLowerCase().includes('remote') ||
+          job.title.toLowerCase().includes('remote');
+        const isHybridLoc =
+          (job.location || '').toLowerCase().includes('hybrid') ||
+          job.title.toLowerCase().includes('hybrid');
+
+        const fallbackArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
+          ? 'REMOTE'
+          : isHybridLoc
+          ? 'HYBRID'
+          : 'ONSITE';
+
         return {
           ...job,
           matchScore: evalResult.matchScore,
@@ -157,8 +170,8 @@ export class ScraperService {
           strengths: evalResult.strengths || [],
           skillGaps: evalResult.skillGaps || [],
           recommendation,
-          workArrangement: evalResult.workArrangement || 'REMOTE',
-          salaryFit: evalResult.salaryFit || 'REMOTE_MATCH',
+          workArrangement: evalResult.workArrangement || fallbackArrangement,
+          salaryFit: evalResult.salaryFit || (isRemoteLoc ? 'REMOTE_MATCH' : 'UNDISCLOSED_ESTIMATED'),
           estimatedSalaryRange: evalResult.estimatedSalaryRange,
           trackedStatus: tracked ? tracked.status : null,
           trackedApplicationId: tracked ? tracked.id : null,
