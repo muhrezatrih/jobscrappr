@@ -26,6 +26,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Briefcase,
+  ArrowUpDown,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 interface DiscoveryFeedProps {
@@ -33,6 +35,14 @@ interface DiscoveryFeedProps {
 }
 
 type WorkFilterType = 'ALL' | 'REMOTE_ONLY' | 'HYBRID_ONSITE' | 'UNAPPLIED_ONLY';
+type SortOption =
+  | 'MATCH_DESC'
+  | 'MATCH_ASC'
+  | 'SALARY_FIRST'
+  | 'REMOTE_FIRST'
+  | 'RECENT'
+  | 'COMPANY_ASC'
+  | 'TITLE_ASC';
 
 export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [keywords, setKeywords] = useState('Backend Developer');
@@ -41,6 +51,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [useJobstreet, setUseJobstreet] = useState(true);
   const [past24Hours, setPast24Hours] = useState(true);
   const [workFilter, setWorkFilter] = useState<WorkFilterType>('ALL');
+  const [sortBy, setSortBy] = useState<SortOption>('MATCH_DESC');
 
   const [isLoading, setIsLoading] = useState(false);
   const [jobs, setJobs] = useState<EvaluatedScrapedJob[]>([]);
@@ -81,10 +92,10 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Reset to page 1 whenever search results or filter pills change
+  // Reset to page 1 whenever search results, filter pills, or sort options change
   useEffect(() => {
     setCurrentPage(1);
-  }, [workFilter, jobs.length]);
+  }, [workFilter, sortBy, jobs.length]);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -184,37 +195,58 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Filter jobs based on active quick-pill
+  // 1. Filter jobs based on active quick-pill
   const filteredJobs = jobs.filter((job) => {
     const isRemote = job.workArrangement === 'REMOTE';
     const isUnapplied = job.trackedStatus !== 'APPLIED' && job.trackedStatus !== 'SKIPPED';
 
-    if (workFilter === 'REMOTE_ONLY') {
-      return isRemote;
-    }
-
-    if (workFilter === 'HYBRID_ONSITE') {
-      return !isRemote;
-    }
-
-    if (workFilter === 'UNAPPLIED_ONLY') {
-      return isUnapplied;
-    }
-
+    if (workFilter === 'REMOTE_ONLY') return isRemote;
+    if (workFilter === 'HYBRID_ONSITE') return !isRemote;
+    if (workFilter === 'UNAPPLIED_ONLY') return isUnapplied;
     return true;
+  });
+
+  // 2. Sort filtered jobs based on active sort option
+  const sortedJobs = [...filteredJobs].sort((a, b) => {
+    switch (sortBy) {
+      case 'MATCH_DESC':
+        return b.matchScore - a.matchScore;
+      case 'MATCH_ASC':
+        return a.matchScore - b.matchScore;
+      case 'SALARY_FIRST': {
+        const aHasSalary = Boolean(a.salary && a.salary.trim());
+        const bHasSalary = Boolean(b.salary && b.salary.trim());
+        if (aHasSalary !== bHasSalary) return aHasSalary ? -1 : 1;
+        return b.matchScore - a.matchScore;
+      }
+      case 'REMOTE_FIRST': {
+        const order: Record<string, number> = { REMOTE: 1, HYBRID: 2, ONSITE: 3 };
+        const orderA = order[a.workArrangement || 'ONSITE'] || 3;
+        const orderB = order[b.workArrangement || 'ONSITE'] || 3;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.matchScore - a.matchScore;
+      }
+      case 'COMPANY_ASC':
+        return a.company.localeCompare(b.company);
+      case 'TITLE_ASC':
+        return a.title.localeCompare(b.title);
+      case 'RECENT':
+      default:
+        return 0; // Natural order
+    }
   });
 
   const unappliedCount = jobs.filter(
     (j) => j.trackedStatus !== 'APPLIED' && j.trackedStatus !== 'SKIPPED',
   ).length;
 
-  // Derived Pagination Calculations
-  const totalJobs = filteredJobs.length;
+  // 3. Derived Pagination Calculations
+  const totalJobs = sortedJobs.length;
   const totalPages = Math.max(1, Math.ceil(totalJobs / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, totalJobs);
-  const paginatedJobs = filteredJobs.slice(startIndex, endIndex);
+  const paginatedJobs = sortedJobs.slice(startIndex, endIndex);
 
   const handlePageChange = (newPage: number) => {
     if (newPage < 1 || newPage > totalPages) return;
@@ -317,12 +349,13 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
         </div>
       </form>
 
-      {/* Quick Filter Pills */}
+      {/* Filter and Sort Control Bar */}
       {hasSearched && (
-        <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-          <div className="flex items-center space-x-2">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 px-1">
+          {/* Quick Filter Pills */}
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider mr-1">
-              Filter View:
+              Filter:
             </span>
             <button
               type="button"
@@ -376,9 +409,33 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             </button>
           </div>
 
-          <span className="text-xs text-zinc-400">
-            Showing {totalJobs > 0 ? startIndex + 1 : 0}–{endIndex} of {totalJobs} results
-          </span>
+          {/* Sort Dropdown & Count */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1.5 bg-white dark:bg-zinc-800/90 px-3 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs shadow-2xs">
+              <ArrowUpDown className="w-3.5 h-3.5 text-blue-500" />
+              <span className="font-semibold text-zinc-500 dark:text-zinc-400">Sort:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value as SortOption);
+                  setCurrentPage(1);
+                }}
+                className="bg-transparent font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none cursor-pointer"
+              >
+                <option value="MATCH_DESC">✨ Highest Match First</option>
+                <option value="MATCH_ASC">Lowest Match First</option>
+                <option value="SALARY_FIRST">💵 Salary Listed First</option>
+                <option value="REMOTE_FIRST">🌐 Remote & Hybrid First</option>
+                <option value="RECENT">🕒 Most Recent / Scraped</option>
+                <option value="COMPANY_ASC">🏢 Company Name (A–Z)</option>
+                <option value="TITLE_ASC">💼 Job Title (A–Z)</option>
+              </select>
+            </div>
+
+            <span className="text-xs text-zinc-400 hidden lg:inline">
+              Showing {totalJobs > 0 ? startIndex + 1 : 0}–{endIndex} of {totalJobs}
+            </span>
+          </div>
         </div>
       )}
 
@@ -496,7 +553,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                     </span>
                     <span>•</span>
                     <span className="flex items-center space-x-1">
-                      <Clock className="w-3 h-3" />
+                      <Clock className="w-3.5 h-3.5" />
                       <span>{job.postedAt || 'Past 24h'}</span>
                     </span>
                   </div>
