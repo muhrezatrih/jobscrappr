@@ -57,56 +57,66 @@ export class LinkedinScraperService {
   ): Promise<ScrapedJobItem[]> {
     try {
       const timeFilter = past24Hours ? '&f_TPR=r86400' : '';
-      const searchUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(
-        keywords,
-      )}&location=${encodeURIComponent(location)}${timeFilter}&start=0`;
-
-      this.logger.log(`Fetching LinkedIn 24h jobs from: ${searchUrl}`);
-      const html = await this.fetchHtml(searchUrl);
-
       const jobs: ScrapedJobItem[] = [];
-      const cardRegex = /<li[\s\S]*?<\/li>/g;
-      const cards = html.match(cardRegex) || [];
+      const seenJobIds = new Set<string>();
 
-      for (const card of cards.slice(0, 15)) {
-        try {
-          const titleMatch = card.match(/<h3[^>]*base-search-card__title[^>]*>([\s\S]*?)<\/h3>/i);
-          const companyMatch = card.match(/<h4[^>]*base-search-card__subtitle[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
-                               card.match(/<h4[^>]*base-search-card__subtitle[^>]*>([\s\S]*?)<\/h4>/i);
-          const locationMatch = card.match(/<span[^>]*job-search-card__location[^>]*>([\s\S]*?)<\/span>/i);
-          const linkMatch = card.match(/<a[^>]*base-card__full-link[^>]*href="([^"]*)"/i);
-          const dateMatch = card.match(/<time[^>]*datetime="([^"]*)"[^>]*>([\s\S]*?)<\/time>/i);
-          const urnMatch = card.match(/data-entity-urn="urn:li:jobPosting:(\d+)"/i);
+      // Fetch 2 pages of LinkedIn search results (page 1: start=0, page 2: start=25)
+      const pageStarts = [0, 25];
 
-          const title = titleMatch ? titleMatch[1].trim() : '';
-          const company = companyMatch ? companyMatch[1].trim().replace(/<[^>]*>/g, '') : '';
-          const loc = locationMatch ? locationMatch[1].trim() : location;
-          let jobUrl = linkMatch ? linkMatch[1].split('?')[0] : '';
-          const jobId = urnMatch ? urnMatch[1] : `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const postedAt = dateMatch ? (dateMatch[2] || dateMatch[1]).trim() : 'Past 24h';
+      for (const start of pageStarts) {
+        const searchUrl = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(
+          keywords,
+        )}&location=${encodeURIComponent(location)}${timeFilter}&start=${start}`;
 
-          if (title && jobUrl) {
-            jobs.push({
-              jobId,
-              title,
-              company: company || 'Company via LinkedIn',
-              location: loc,
-              jobUrl,
-              portal: 'LINKEDIN',
-              postedAt,
-              description: `Position: ${title} at ${company}. Location: ${loc}. Posted recently on LinkedIn (${postedAt}).`,
-            });
+        this.logger.log(`Fetching LinkedIn 24h jobs page (start=${start}) from: ${searchUrl}`);
+        const html = await this.fetchHtml(searchUrl);
+
+        const cardRegex = /<li[\s\S]*?<\/li>/g;
+        const cards = html.match(cardRegex) || [];
+        if (cards.length === 0) break;
+
+        for (const card of cards) {
+          try {
+            const titleMatch = card.match(/<h3[^>]*base-search-card__title[^>]*>([\s\S]*?)<\/h3>/i);
+            const companyMatch =
+              card.match(/<h4[^>]*base-search-card__subtitle[^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/i) ||
+              card.match(/<h4[^>]*base-search-card__subtitle[^>]*>([\s\S]*?)<\/h4>/i);
+            const locationMatch = card.match(/<span[^>]*job-search-card__location[^>]*>([\s\S]*?)<\/span>/i);
+            const linkMatch = card.match(/<a[^>]*base-card__full-link[^>]*href="([^"]*)"/i);
+            const dateMatch = card.match(/<time[^>]*datetime="([^"]*)"[^>]*>([\s\S]*?)<\/time>/i);
+            const urnMatch = card.match(/data-entity-urn="urn:li:jobPosting:(\d+)"/i);
+
+            const title = titleMatch ? titleMatch[1].trim() : '';
+            const company = companyMatch ? companyMatch[1].trim().replace(/<[^>]*>/g, '') : '';
+            const loc = locationMatch ? locationMatch[1].trim() : location;
+            let jobUrl = linkMatch ? linkMatch[1].split('?')[0] : '';
+            const jobId = urnMatch ? urnMatch[1] : `li-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+            const postedAt = dateMatch ? (dateMatch[2] || dateMatch[1]).trim() : 'Past 24h';
+
+            if (title && jobUrl && !seenJobIds.has(jobId)) {
+              seenJobIds.add(jobId);
+              jobs.push({
+                jobId,
+                title,
+                company: company || 'Company via LinkedIn',
+                location: loc,
+                jobUrl,
+                portal: 'LINKEDIN',
+                postedAt,
+                description: `Position: ${title} at ${company}. Location: ${loc}. Posted recently on LinkedIn (${postedAt}).`,
+              });
+            }
+          } catch (err) {
+            this.logger.debug(`Error parsing single LinkedIn card: ${err.message}`);
           }
-        } catch (err) {
-          this.logger.debug(`Error parsing single LinkedIn card: ${err.message}`);
         }
       }
 
-      this.logger.log(`Parsed ${jobs.length} valid LinkedIn job postings. Fetching detailed descriptions...`);
+      this.logger.log(`Parsed ${jobs.length} total LinkedIn job postings. Fetching detailed descriptions...`);
 
-      // Fetch full descriptions and workplace details in parallel batches of 5
+      // Fetch full descriptions and workplace details in parallel batches of 20
       const jobsWithDetails = await Promise.all(
-        jobs.slice(0, 10).map(async (job) => {
+        jobs.slice(0, 25).map(async (job) => {
           try {
             const detail = await this.fetchJobDetail(job.jobId);
             if (detail) {

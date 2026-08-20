@@ -186,7 +186,7 @@ export class ScraperService {
       }
     };
 
-    const evaluationPromises = allJobs.slice(0, 20).map((j) => evaluateSingle(j));
+    const evaluationPromises = allJobs.slice(0, 30).map((j) => evaluateSingle(j));
     const finalEvaluated = await Promise.all(evaluationPromises);
 
     // Sort descending by match score
