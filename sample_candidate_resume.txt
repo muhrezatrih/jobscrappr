@@ -1,0 +1,19 @@
+Muhammad Reza Tri Hariyanto
+Senior Software Engineer
+Email: reza.tri@techcorp.id
+Phone: +62 812-9876-5432
+Location: Jakarta, Indonesia
+
+SUMMARY:
+Results-driven Senior Fullstack Engineer with 5+ years of production experience building high-scale distributed applications using Next.js, React, TypeScript, Node.js, NestJS, and PostgreSQL.
+
+SKILLS:
+TypeScript, React, Next.js, Node.js, NestJS, PostgreSQL, Prisma ORM, Redis, Docker, TailwindCSS, REST APIs, GraphQL, Microservices, CI/CD.
+
+EXPERIENCE:
+Senior Fullstack Engineer - PT Digital Inovasi Global (2022 - Present)
+- Architected enterprise cloud applications with Next.js and NestJS handling 1M+ monthly active requests.
+- Optimized database query performance and implemented automated CI/CD pipelines.
+
+Backend Developer - Tech Studio Nusantara (2019 - 2022)
+- Built robust RESTful APIs in Node.js & TypeScript with 99.9% uptime.

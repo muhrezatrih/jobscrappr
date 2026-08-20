@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model CandidateProfile {
+  id              String            @id @default(uuid())
+  fullName        String
+  email           String?
+  phone           String?
+  location        String?
+  headline        String?
+  summary         String?           @db.Text
+  skills          String[]
+  experiences     Json?
+  education       Json?
+  rawResumeText   String?           @db.Text
+  resumeFileName  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  preference      SearchPreference?
+}
+
+model SearchPreference {
+  id                    String           @id @default(uuid())
+  profileId             String           @unique
+  profile               CandidateProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  targetRoles           String[]
+  targetLocations       String[]
+  workTypes             String[]
+  minSalary             Int?
+  maxSalary             Int?
+  matchThreshold        Int              @default(70)
+  blacklistedCompanies  String[]
+  blacklistedKeywords   String[]
+  maxDailyApplications  Int              @default(15)
+  dryRunMode            Boolean          @default(true)
+  delayBetweenAppsMin   Int              @default(30)
+  delayBetweenAppsMax   Int              @default(90)
+  jobstreetEmail        String?
+  jobstreetPassword     String?
+  jobstreetCookies      String?          @db.Text
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+}
+
+model JobApplication {
+  id                  String    @id @default(uuid())
+  jobId               String?
+  jobTitle            String
+  companyName         String
+  companyLogo         String?
+  location            String?
+  salaryInfo          String?
+  jobUrl              String
+  portal              String    @default("JOBSTREET")
+  jobDescription      String?   @db.Text
+  requirements        String?   @db.Text
+  matchScore          Int       @default(0)
+  matchReason         String?   @db.Text
+  strengths           String[]
+  skillGaps           String[]
+  status              String    @default("QUEUED")
+  statusMessage       String?
+  customCoverLetter   String?   @db.Text
+  screeningAnswers    Json?
+  appliedAt           DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model ExecutionLog {
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
+  level     String   @default("INFO")
+  source    String   @default("WORKER")
+  action    String
+  message   String   @db.Text
+  metadata  Json?
+}

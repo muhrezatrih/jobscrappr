@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Next.js
+.next/
+*/.next/
+out/
+
+# NestJS / TypeScript
+dist/
+*/dist/
+
+# Environment variables
+.env
+.env.local
+*.env
+!.env.example
+
+# Logs & temp test scripts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.tempmediaStorage/
+.user_uploaded/
+
+# OS files
+.DS_Store
+Thumbs.db
