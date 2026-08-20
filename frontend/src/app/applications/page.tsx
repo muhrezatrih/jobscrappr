@@ -80,7 +80,7 @@ export default function ApplicationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50/50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-6 md:p-10 space-y-6">
+    <div className="w-full flex flex-col space-y-6 animate-fadeIn">
       {/* Header & View Mode Switcher */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
