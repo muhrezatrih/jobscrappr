@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { EvaluatedScrapedJob, api, JobApplication } from '@/lib/api';
 import {
   Search,
@@ -14,13 +14,14 @@ import {
   RefreshCw,
   Plus,
   Globe,
+  BookmarkCheck,
 } from 'lucide-react';
 
 interface DiscoveryFeedProps {
   onJobTracked?: (app: JobApplication) => void;
 }
 
-type WorkFilterType = 'ALL' | 'REMOTE_ONLY' | 'HYBRID_ONSITE';
+type WorkFilterType = 'ALL' | 'REMOTE_ONLY' | 'HYBRID_ONSITE' | 'UNAPPLIED_ONLY';
 
 export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [keywords, setKeywords] = useState('Backend Developer');
@@ -34,6 +35,22 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [jobs, setJobs] = useState<EvaluatedScrapedJob[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
+
+  // Load previously stored matching jobs on mount so user doesn't lose matches
+  useEffect(() => {
+    const loadSaved = async () => {
+      try {
+        const saved = await api.getSavedJobs();
+        if (saved && saved.length > 0) {
+          setJobs(saved);
+          setHasSearched(true);
+        }
+      } catch (err) {
+        console.debug('No previously stored jobs found:', err);
+      }
+    };
+    loadSaved();
+  }, []);
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -120,6 +137,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   // Filter jobs based on active quick-pill
   const filteredJobs = jobs.filter((job) => {
     const isRemote = job.workArrangement === 'REMOTE';
+    const isUnapplied = job.trackedStatus !== 'APPLIED' && job.trackedStatus !== 'SKIPPED';
 
     if (workFilter === 'REMOTE_ONLY') {
       return isRemote;
@@ -129,8 +147,16 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       return !isRemote;
     }
 
+    if (workFilter === 'UNAPPLIED_ONLY') {
+      return isUnapplied;
+    }
+
     return true;
   });
+
+  const unappliedCount = jobs.filter(
+    (j) => j.trackedStatus !== 'APPLIED' && j.trackedStatus !== 'SKIPPED',
+  ).length;
 
   return (
     <div className="w-full flex flex-col space-y-6">
@@ -170,7 +196,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             {isLoading ? (
               <>
                 <RefreshCw className="w-4 h-4 animate-spin" />
-                <span>Scraping & Evaluating...</span>
+                <span>Scraping & Saving...</span>
               </>
             ) : (
               <>
@@ -212,6 +238,11 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
               <span>Remote Preferred</span>
             </span>
 
+            <span className="inline-flex items-center space-x-1 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 px-3 py-1.5 rounded-xl font-bold">
+              <BookmarkCheck className="w-3.5 h-3.5" />
+              <span>Auto-Stored in DB</span>
+            </span>
+
             <span className="inline-flex items-center space-x-1 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 text-amber-700 dark:text-amber-300 px-3 py-1.5 rounded-xl font-bold">
               <Clock className="w-3.5 h-3.5" />
               <span>24h Only</span>
@@ -236,7 +267,20 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                   : 'bg-white dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
               }`}
             >
-              All Matches ({jobs.length})
+              All Stored ({jobs.length})
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setWorkFilter('UNAPPLIED_ONLY')}
+              className={`flex items-center space-x-1 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                workFilter === 'UNAPPLIED_ONLY'
+                  ? 'bg-emerald-600 text-white shadow-sm'
+                  : 'bg-white dark:bg-zinc-800/80 text-zinc-600 dark:text-zinc-400 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Unapplied ({unappliedCount})</span>
             </button>
 
             <button
@@ -267,7 +311,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
           </div>
 
           <span className="text-xs text-zinc-400">
-            Showing {filteredJobs.length} of {jobs.length} postings
+            Showing {filteredJobs.length} of {jobs.length} unique postings
           </span>
         </div>
       )}
@@ -292,7 +336,9 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       {!isLoading && filteredJobs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {filteredJobs.map((job) => {
-            const isTracked = !!job.trackedStatus;
+            const isApplied = job.trackedStatus === 'APPLIED';
+            const isSkipped = job.trackedStatus === 'SKIPPED';
+            const isDiscovered = !isApplied && !isSkipped;
             const isRemote = job.workArrangement === 'REMOTE';
             const isHybrid = job.workArrangement === 'HYBRID';
 
@@ -300,7 +346,11 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
               <div
                 key={job.jobId}
                 className={`bg-white dark:bg-zinc-900/90 rounded-3xl p-5 border shadow-sm transition-all hover:shadow-md flex flex-col justify-between space-y-4 ${
-                  job.recommendation === 'STRONG_MATCH'
+                  isApplied
+                    ? 'border-blue-500/40 bg-blue-50/20 dark:bg-blue-950/10'
+                    : isSkipped
+                    ? 'opacity-60 border-zinc-200 dark:border-zinc-800'
+                    : job.recommendation === 'STRONG_MATCH'
                     ? 'border-emerald-500/30 hover:border-emerald-500/60'
                     : 'border-zinc-200/90 dark:border-zinc-800 hover:border-blue-500/40'
                 }`}
@@ -333,6 +383,18 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                       <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
                         <MapPin className="w-3 h-3" />
                         <span>On-site</span>
+                      </span>
+                    )}
+
+                    {/* Stored State Indicator */}
+                    {isApplied && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950 text-blue-800 dark:text-blue-200">
+                        ✓ Applied
+                      </span>
+                    )}
+                    {isSkipped && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-zinc-200 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                        ✕ Skipped
                       </span>
                     )}
                   </div>
@@ -416,11 +478,19 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                     <span>View JD</span>
                   </a>
 
-                  {isTracked ? (
-                    <span className="flex items-center space-x-1.5 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs font-bold border border-zinc-200 dark:border-zinc-700">
+                  {isApplied ? (
+                    <span className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold border border-blue-200 dark:border-blue-800">
                       <Check className="w-3.5 h-3.5 text-blue-500" />
-                      <span>Tracked ({job.trackedStatus})</span>
+                      <span>Tracked (APPLIED)</span>
                     </span>
+                  ) : isSkipped ? (
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAndTrack(job)}
+                      className="flex items-center space-x-1 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-blue-600 hover:text-white text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-semibold transition-all"
+                    >
+                      <span>Undo Skip</span>
+                    </button>
                   ) : (
                     <div className="flex items-center space-x-2">
                       <button
@@ -459,7 +529,7 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             Ready to find fresh backend jobs?
           </h4>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md">
-            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. Gemini AI will evaluate your CV qualifications and identify Remote roles automatically.
+            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. All matched opportunities are automatically saved to your database and deduplicated on subsequent scrapes!
           </p>
         </div>
       )}

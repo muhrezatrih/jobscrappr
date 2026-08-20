@@ -1,4 +1,4 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Get, Post } from '@nestjs/common';
 import { ScraperService, EvaluatedScrapedJob } from './scraper.service';
 
 export class SearchJobsDto {
@@ -11,6 +11,11 @@ export class SearchJobsDto {
 @Controller('scraper')
 export class ScraperController {
   constructor(private scraperService: ScraperService) {}
+
+  @Get('saved')
+  async getSavedJobs(): Promise<EvaluatedScrapedJob[]> {
+    return this.scraperService.getStoredDiscoveredJobs();
+  }
 
   @Post('search')
   async searchJobs(@Body() body: SearchJobsDto): Promise<EvaluatedScrapedJob[]> {

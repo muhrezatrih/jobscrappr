@@ -102,20 +102,80 @@ export class ScraperService {
 
     // 2. Fetch existing tracked applications to link status
     const existingApps = await this.prisma.jobApplication.findMany({
-      select: { id: true, jobId: true, jobUrl: true, status: true },
+      select: {
+        id: true,
+        jobId: true,
+        jobUrl: true,
+        status: true,
+        jobTitle: true,
+        companyName: true,
+        location: true,
+        salaryInfo: true,
+        portal: true,
+        jobDescription: true,
+        requirements: true,
+        matchScore: true,
+        matchReason: true,
+        strengths: true,
+        skillGaps: true,
+        createdAt: true,
+      },
     });
 
     const trackedMap = new Map<string, { id: string; status: string }>();
+    const existingUrlSet = new Set<string>();
+    const existingIdSet = new Set<string>();
+
     for (const app of existingApps) {
-      if (app.jobId) trackedMap.set(app.jobId, { id: app.id, status: app.status });
-      if (app.jobUrl) trackedMap.set(app.jobUrl, { id: app.id, status: app.status });
+      if (app.jobId) {
+        trackedMap.set(app.jobId, { id: app.id, status: app.status });
+        existingIdSet.add(app.jobId);
+      }
+      if (app.jobUrl) {
+        trackedMap.set(app.jobUrl, { id: app.id, status: app.status });
+        existingUrlSet.add(app.jobUrl);
+      }
     }
 
-    // 3. AI Evaluation in parallel batches
-    const evaluatedJobs: EvaluatedScrapedJob[] = [];
-
+    // 3. AI Evaluation: Reuse existing evaluations from DB if already evaluated
     const evaluateSingle = async (job: ScrapedJobItem): Promise<EvaluatedScrapedJob> => {
-      const tracked = trackedMap.get(job.jobId) || trackedMap.get(job.jobUrl);
+      const existingApp = existingApps.find(
+        (a) => (a.jobId && a.jobId === job.jobId) || (a.jobUrl && a.jobUrl === job.jobUrl),
+      );
+
+      const isRemoteLoc =
+        (job.location || '').toLowerCase().includes('remote') ||
+        job.title.toLowerCase().includes('remote');
+      const isHybridLoc =
+        (job.location || '').toLowerCase().includes('hybrid') ||
+        job.title.toLowerCase().includes('hybrid');
+
+      const fallbackArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
+        ? 'REMOTE'
+        : isHybridLoc
+        ? 'HYBRID'
+        : 'ONSITE';
+
+      // If already stored and evaluated in database, reuse it instantly!
+      if (existingApp && existingApp.matchScore > 0) {
+        let recommendation: EvaluatedScrapedJob['recommendation'] = 'STRONG_MATCH';
+        if (existingApp.matchScore >= 80) recommendation = 'STRONG_MATCH';
+        else if (existingApp.matchScore >= 65) recommendation = 'GOOD_MATCH';
+        else if (existingApp.matchScore >= 45) recommendation = 'POTENTIAL_GAP';
+        else recommendation = 'LOW_FIT';
+
+        return {
+          ...job,
+          matchScore: existingApp.matchScore,
+          matchReason: existingApp.matchReason || 'Stored candidate compatibility evaluation.',
+          strengths: existingApp.strengths || [],
+          skillGaps: existingApp.skillGaps || [],
+          recommendation,
+          workArrangement: fallbackArrangement,
+          trackedStatus: existingApp.status,
+          trackedApplicationId: existingApp.id,
+        };
+      }
 
       if (!profile) {
         return {
@@ -125,8 +185,9 @@ export class ScraperService {
           strengths: ['Backend Engineering', 'REST APIs', 'Node.js', 'PostgreSQL'],
           skillGaps: [],
           recommendation: 'STRONG_MATCH',
-          trackedStatus: tracked ? tracked.status : null,
-          trackedApplicationId: tracked ? tracked.id : null,
+          workArrangement: fallbackArrangement,
+          trackedStatus: existingApp ? existingApp.status : 'DISCOVERED',
+          trackedApplicationId: existingApp ? existingApp.id : null,
         };
       }
 
@@ -148,18 +209,38 @@ export class ScraperService {
         else if (evalResult.matchScore >= 45) recommendation = 'POTENTIAL_GAP';
         else recommendation = 'LOW_FIT';
 
-        const isRemoteLoc =
-          (job.location || '').toLowerCase().includes('remote') ||
-          job.title.toLowerCase().includes('remote');
-        const isHybridLoc =
-          (job.location || '').toLowerCase().includes('hybrid') ||
-          job.title.toLowerCase().includes('hybrid');
+        // Auto-save new matching jobs to database so they persist across sessions
+        let trackedStatus = existingApp ? existingApp.status : null;
+        let trackedApplicationId = existingApp ? existingApp.id : null;
 
-        const fallbackArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
-          ? 'REMOTE'
-          : isHybridLoc
-          ? 'HYBRID'
-          : 'ONSITE';
+        if (!existingApp && evalResult.matchScore >= 70) {
+          try {
+            const saved = await this.prisma.jobApplication.create({
+              data: {
+                jobId: job.jobId,
+                jobTitle: job.title,
+                companyName: job.company,
+                location: job.location,
+                salaryInfo: job.salary,
+                jobUrl: job.jobUrl,
+                portal: job.portal || 'LINKEDIN',
+                jobDescription: job.description,
+                requirements: job.requirements,
+                matchScore: evalResult.matchScore,
+                matchReason: evalResult.matchReason,
+                strengths: evalResult.strengths || [],
+                skillGaps: evalResult.skillGaps || [],
+                status: 'DISCOVERED',
+              },
+            });
+            trackedStatus = 'DISCOVERED';
+            trackedApplicationId = saved.id;
+            trackedMap.set(job.jobId, { id: saved.id, status: 'DISCOVERED' });
+            if (job.jobUrl) trackedMap.set(job.jobUrl, { id: saved.id, status: 'DISCOVERED' });
+          } catch (saveErr) {
+            this.logger.debug(`Could not auto-persist discovered job: ${saveErr.message}`);
+          }
+        }
 
         return {
           ...job,
@@ -169,8 +250,8 @@ export class ScraperService {
           skillGaps: evalResult.skillGaps || [],
           recommendation,
           workArrangement: evalResult.workArrangement || fallbackArrangement,
-          trackedStatus: tracked ? tracked.status : null,
-          trackedApplicationId: tracked ? tracked.id : null,
+          trackedStatus,
+          trackedApplicationId,
         };
       } catch (e) {
         return {
@@ -180,16 +261,134 @@ export class ScraperService {
           strengths: ['Node.js', 'TypeScript', 'PostgreSQL'],
           skillGaps: [],
           recommendation: 'GOOD_MATCH',
-          trackedStatus: tracked ? tracked.status : null,
-          trackedApplicationId: tracked ? tracked.id : null,
+          workArrangement: fallbackArrangement,
+          trackedStatus: existingApp ? existingApp.status : null,
+          trackedApplicationId: existingApp ? existingApp.id : null,
         };
       }
     };
 
-    const evaluationPromises = allJobs.slice(0, 30).map((j) => evaluateSingle(j));
-    const finalEvaluated = await Promise.all(evaluationPromises);
+    // Evaluate in batches of 4 with small pacing to respect free-tier rate limits
+    const newlyEvaluated: EvaluatedScrapedJob[] = [];
+    const jobsToEvaluate = allJobs.slice(0, 25);
+    const batchSize = 4;
+
+    for (let i = 0; i < jobsToEvaluate.length; i += batchSize) {
+      const chunk = jobsToEvaluate.slice(i, i + batchSize);
+      const chunkResults = await Promise.all(chunk.map((j) => evaluateSingle(j)));
+      newlyEvaluated.push(...chunkResults);
+      if (i + batchSize < jobsToEvaluate.length) {
+        await new Promise((r) => setTimeout(r, 400));
+      }
+    }
+
+    // Merge with previously stored DISCOVERED jobs from database
+    const seenMap = new Map<string, EvaluatedScrapedJob>();
+    for (const j of newlyEvaluated) {
+      seenMap.set(j.jobId, j);
+      if (j.jobUrl) seenMap.set(j.jobUrl, j);
+    }
+
+    for (const app of existingApps) {
+      const alreadyIncluded = (app.jobId && seenMap.has(app.jobId)) || (app.jobUrl && seenMap.has(app.jobUrl));
+      if (!alreadyIncluded) {
+        let recommendation: EvaluatedScrapedJob['recommendation'] = 'STRONG_MATCH';
+        if (app.matchScore >= 80) recommendation = 'STRONG_MATCH';
+        else if (app.matchScore >= 65) recommendation = 'GOOD_MATCH';
+        else if (app.matchScore >= 45) recommendation = 'POTENTIAL_GAP';
+        else recommendation = 'LOW_FIT';
+
+        const isRemoteLoc =
+          (app.location || '').toLowerCase().includes('remote') ||
+          app.jobTitle.toLowerCase().includes('remote');
+        const isHybridLoc =
+          (app.location || '').toLowerCase().includes('hybrid') ||
+          app.jobTitle.toLowerCase().includes('hybrid');
+
+        const workArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
+          ? 'REMOTE'
+          : isHybridLoc
+          ? 'HYBRID'
+          : 'ONSITE';
+
+        const converted: EvaluatedScrapedJob = {
+          jobId: app.jobId || app.id,
+          title: app.jobTitle,
+          company: app.companyName,
+          location: app.location || 'Indonesia',
+          salary: app.salaryInfo || undefined,
+          jobUrl: app.jobUrl,
+          portal: (app.portal === 'JOBSTREET' ? 'JOBSTREET' : 'LINKEDIN') as 'LINKEDIN' | 'JOBSTREET',
+          postedAt: 'Previously Stored',
+          description: app.jobDescription || undefined,
+          requirements: app.requirements || undefined,
+          matchScore: app.matchScore,
+          matchReason: app.matchReason || 'Stored match from previous discovery search.',
+          strengths: app.strengths || [],
+          skillGaps: app.skillGaps || [],
+          recommendation,
+          workArrangement,
+          trackedStatus: app.status,
+          trackedApplicationId: app.id,
+        };
+
+        if (app.jobId) seenMap.set(app.jobId, converted);
+        else seenMap.set(app.id, converted);
+      }
+    }
+
+    const mergedList = Array.from(new Set(seenMap.values()));
 
     // Sort descending by match score
-    return finalEvaluated.sort((a, b) => b.matchScore - a.matchScore);
+    return mergedList.sort((a, b) => b.matchScore - a.matchScore);
+  }
+
+  async getStoredDiscoveredJobs(): Promise<EvaluatedScrapedJob[]> {
+    const apps = await this.prisma.jobApplication.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    return apps.map((app) => {
+      let recommendation: EvaluatedScrapedJob['recommendation'] = 'STRONG_MATCH';
+      if (app.matchScore >= 80) recommendation = 'STRONG_MATCH';
+      else if (app.matchScore >= 65) recommendation = 'GOOD_MATCH';
+      else if (app.matchScore >= 45) recommendation = 'POTENTIAL_GAP';
+      else recommendation = 'LOW_FIT';
+
+      const isRemoteLoc =
+        (app.location || '').toLowerCase().includes('remote') ||
+        app.jobTitle.toLowerCase().includes('remote');
+      const isHybridLoc =
+        (app.location || '').toLowerCase().includes('hybrid') ||
+        app.jobTitle.toLowerCase().includes('hybrid');
+
+      const workArrangement: 'REMOTE' | 'HYBRID' | 'ONSITE' = isRemoteLoc
+        ? 'REMOTE'
+        : isHybridLoc
+        ? 'HYBRID'
+        : 'ONSITE';
+
+      return {
+        jobId: app.jobId || app.id,
+        title: app.jobTitle,
+        company: app.companyName,
+        location: app.location || 'Indonesia',
+        salary: app.salaryInfo || undefined,
+        jobUrl: app.jobUrl,
+        portal: (app.portal === 'JOBSTREET' ? 'JOBSTREET' : 'LINKEDIN') as 'LINKEDIN' | 'JOBSTREET',
+        postedAt: 'Previously Stored',
+        description: app.jobDescription || undefined,
+        requirements: app.requirements || undefined,
+        matchScore: app.matchScore,
+        matchReason: app.matchReason || 'Stored match from previous discovery search.',
+        strengths: app.strengths || [],
+        skillGaps: app.skillGaps || [],
+        recommendation,
+        workArrangement,
+        trackedStatus: app.status,
+        trackedApplicationId: app.id,
+      };
+    });
   }
 }

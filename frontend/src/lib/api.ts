@@ -181,6 +181,12 @@ export const api = {
     return res.json();
   },
 
+  async getSavedJobs(): Promise<EvaluatedScrapedJob[]> {
+    const res = await fetch(`${API_BASE}/scraper/saved`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load saved jobs');
+    return res.json();
+  },
+
   // Sankey Funnel Analytics
   async getSankeyAnalytics(): Promise<SankeyAnalyticsResponse> {
     const res = await fetch(`${API_BASE}/jobs/analytics/sankey`, { cache: 'no-store' });
