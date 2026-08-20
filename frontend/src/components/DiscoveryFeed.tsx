@@ -502,53 +502,35 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                   )}
                 </div>
 
-                {/* In-Card Collapsible JD Snippet */}
+                {/* Preview Full Job Description Trigger Button */}
                 {job.description && (
-                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCardId(isExpanded ? null : job.jobId)}
-                      className="w-full flex items-center justify-between py-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-semibold"
-                    >
-                      <span className="flex items-center space-x-1.5">
-                        <FileText className="w-3.5 h-3.5 text-blue-500" />
-                        <span>{isExpanded ? 'Hide Job Description' : 'Preview Job Description'}</span>
-                      </span>
-                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-
-                    {isExpanded && (
-                      <div className="mt-2 p-3 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl max-h-48 overflow-y-auto font-normal text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed border border-zinc-200 dark:border-zinc-700 text-[11px]">
-                        {job.description}
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedJob(job)}
+                    className="w-full flex items-center justify-between px-3.5 py-2.5 bg-zinc-50 dark:bg-zinc-800/60 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-zinc-700 dark:text-zinc-300 hover:text-blue-600 dark:hover:text-blue-400 rounded-2xl border border-zinc-200/80 dark:border-zinc-700/80 transition-all group font-semibold text-xs"
+                  >
+                    <span className="flex items-center space-x-2">
+                      <FileText className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
+                      <span>Preview Job Description</span>
+                    </span>
+                    <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400 bg-white dark:bg-zinc-800 px-2 py-0.5 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-2xs">
+                      View Full JD ↗
+                    </span>
+                  </button>
                 )}
 
                 {/* Bottom Action Footer */}
-                <div className="pt-2 flex items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
-                    {/* Full JD Modal Button */}
-                    <button
-                      type="button"
-                      onClick={() => setSelectedJob(job)}
-                      className="px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-xl transition-all flex items-center space-x-1.5 border border-blue-200/60 dark:border-blue-800/60"
-                      title="Read Full Job Description & Requirements"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      <span>Read Full JD</span>
-                    </button>
-
-                    <a
-                      href={job.jobUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 bg-zinc-50 dark:bg-zinc-800/60 rounded-xl hover:bg-zinc-100 transition-all flex items-center space-x-1 text-xs"
-                      title="Open Original Job Link on External Portal"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  </div>
+                <div className="pt-1 flex items-center justify-between gap-2">
+                  <a
+                    href={job.jobUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="px-3 py-2 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 transition-all flex items-center space-x-1.5 text-xs font-semibold"
+                    title="Open Original Job Link on External Portal"
+                  >
+                    <span>View on {job.portal}</span>
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </a>
 
                   {isApplied ? (
                     <span className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold border border-blue-200 dark:border-blue-800">
