@@ -391,4 +391,51 @@ export class ScraperService {
       };
     });
   }
+
+  async getScraperStats(): Promise<{
+    discoveredCount: number;
+    skippedCount: number;
+    appliedCount: number;
+    totalStored: number;
+  }> {
+    const [discoveredCount, skippedCount, appliedCount, totalStored] =
+      await Promise.all([
+        this.prisma.jobApplication.count({ where: { status: 'DISCOVERED' } }),
+        this.prisma.jobApplication.count({ where: { status: 'SKIPPED' } }),
+        this.prisma.jobApplication.count({
+          where: { status: { notIn: ['DISCOVERED', 'SKIPPED'] } },
+        }),
+        this.prisma.jobApplication.count(),
+      ]);
+
+    return {
+      discoveredCount,
+      skippedCount,
+      appliedCount,
+      totalStored,
+    };
+  }
+
+  async purgeDiscoveredAndSkippedJobs(): Promise<{
+    deletedCount: number;
+    remainingAppliedCount: number;
+  }> {
+    const { count } = await this.prisma.jobApplication.deleteMany({
+      where: {
+        status: { in: ['DISCOVERED', 'SKIPPED'] },
+      },
+    });
+
+    const remainingAppliedCount = await this.prisma.jobApplication.count();
+
+    this.logger.log(
+      `Purged ${count} discovered/skipped jobs. Remaining active applications: ${remainingAppliedCount}`,
+    );
+
+    return {
+      deletedCount: count,
+      remainingAppliedCount,
+    };
+  }
 }
+

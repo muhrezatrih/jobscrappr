@@ -187,6 +187,28 @@ export const api = {
     return res.json();
   },
 
+  async getScraperStats(): Promise<{
+    discoveredCount: number;
+    skippedCount: number;
+    appliedCount: number;
+    totalStored: number;
+  }> {
+    const res = await fetch(`${API_BASE}/scraper/stats`, { cache: 'no-store' });
+    if (!res.ok) throw new Error('Failed to load scraper stats');
+    return res.json();
+  },
+
+  async purgeScrapedJobs(): Promise<{
+    deletedCount: number;
+    remainingAppliedCount: number;
+  }> {
+    const res = await fetch(`${API_BASE}/scraper/purge`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error('Failed to purge scraped jobs');
+    return res.json();
+  },
+
   // Sankey Funnel Analytics
   async getSankeyAnalytics(): Promise<SankeyAnalyticsResponse> {
     const res = await fetch(`${API_BASE}/jobs/analytics/sankey`, { cache: 'no-store' });
