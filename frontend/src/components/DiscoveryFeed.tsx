@@ -15,6 +15,14 @@ import {
   Plus,
   Globe,
   BookmarkCheck,
+  FileText,
+  X,
+  Copy,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  AlertCircle,
+  Briefcase,
 } from 'lucide-react';
 
 interface DiscoveryFeedProps {
@@ -36,6 +44,11 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
   const [hasSearched, setHasSearched] = useState(false);
   const [trackingId, setTrackingId] = useState<string | null>(null);
 
+  // Modal and accordion state
+  const [selectedJob, setSelectedJob] = useState<EvaluatedScrapedJob | null>(null);
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
   // Load previously stored matching jobs on mount so user doesn't lose matches
   useEffect(() => {
     const loadSaved = async () => {
@@ -50,6 +63,15 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       }
     };
     loadSaved();
+  }, []);
+
+  // Handle ESC key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSelectedJob(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleSearch = async (e?: React.FormEvent) => {
@@ -104,6 +126,10 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
         prev.map((j) => (j.jobId === job.jobId ? { ...j, trackedStatus: 'APPLIED', trackedApplicationId: app.id } : j)),
       );
 
+      if (selectedJob?.jobId === job.jobId) {
+        setSelectedJob((prev) => (prev ? { ...prev, trackedStatus: 'APPLIED', trackedApplicationId: app.id } : null));
+      }
+
       if (onJobTracked) onJobTracked(app);
     } catch (err) {
       console.error('Error tracking applied job:', err);
@@ -129,9 +155,20 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
       setJobs((prev) =>
         prev.map((j) => (j.jobId === job.jobId ? { ...j, trackedStatus: 'SKIPPED' } : j)),
       );
+
+      if (selectedJob?.jobId === job.jobId) {
+        setSelectedJob((prev) => (prev ? { ...prev, trackedStatus: 'SKIPPED' } : null));
+      }
     } catch (err) {
       console.error('Error skipping job:', err);
     }
+  };
+
+  const handleCopyJD = (text?: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // Filter jobs based on active quick-pill
@@ -338,9 +375,9 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
           {filteredJobs.map((job) => {
             const isApplied = job.trackedStatus === 'APPLIED';
             const isSkipped = job.trackedStatus === 'SKIPPED';
-            const isDiscovered = !isApplied && !isSkipped;
             const isRemote = job.workArrangement === 'REMOTE';
             const isHybrid = job.workArrangement === 'HYBRID';
+            const isExpanded = expandedCardId === job.jobId;
 
             return (
               <div
@@ -465,18 +502,53 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
                   )}
                 </div>
 
+                {/* In-Card Collapsible JD Snippet */}
+                {job.description && (
+                  <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCardId(isExpanded ? null : job.jobId)}
+                      className="w-full flex items-center justify-between py-1 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 font-semibold"
+                    >
+                      <span className="flex items-center space-x-1.5">
+                        <FileText className="w-3.5 h-3.5 text-blue-500" />
+                        <span>{isExpanded ? 'Hide Job Description' : 'Preview Job Description'}</span>
+                      </span>
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {isExpanded && (
+                      <div className="mt-2 p-3 bg-zinc-100/80 dark:bg-zinc-800/80 rounded-xl max-h-48 overflow-y-auto font-normal text-zinc-700 dark:text-zinc-300 whitespace-pre-wrap leading-relaxed border border-zinc-200 dark:border-zinc-700 text-[11px]">
+                        {job.description}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Bottom Action Footer */}
                 <div className="pt-2 flex items-center justify-between gap-2">
-                  <a
-                    href={job.jobUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="p-2.5 text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 bg-zinc-100 dark:bg-zinc-800 rounded-xl hover:bg-zinc-200 transition-all flex items-center space-x-1 text-xs"
-                    title="View Job Description"
-                  >
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    <span>View JD</span>
-                  </a>
+                  <div className="flex items-center space-x-2">
+                    {/* Full JD Modal Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedJob(job)}
+                      className="px-3 py-2 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-xl transition-all flex items-center space-x-1.5 border border-blue-200/60 dark:border-blue-800/60"
+                      title="Read Full Job Description & Requirements"
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      <span>Read Full JD</span>
+                    </button>
+
+                    <a
+                      href={job.jobUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 bg-zinc-50 dark:bg-zinc-800/60 rounded-xl hover:bg-zinc-100 transition-all flex items-center space-x-1 text-xs"
+                      title="Open Original Job Link on External Portal"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
 
                   {isApplied ? (
                     <span className="flex items-center space-x-1.5 px-4 py-2 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-bold border border-blue-200 dark:border-blue-800">
@@ -529,8 +601,225 @@ export default function DiscoveryFeed({ onJobTracked }: DiscoveryFeedProps) {
             Ready to find fresh backend jobs?
           </h4>
           <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-md">
-            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. All matched opportunities are automatically saved to your database and deduplicated on subsequent scrapes!
+            Click <strong>Scrape Jobs (24h)</strong> above to pull live postings from LinkedIn and Jobstreet. All job descriptions are retrieved directly inside the app so you never have to browse external tabs!
           </p>
+        </div>
+      )}
+
+      {/* Full Job Description Modal Dialog */}
+      {selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 md:p-10 bg-black/60 backdrop-blur-md animate-fadeIn">
+          <div
+            className="bg-white dark:bg-zinc-900 w-full max-w-3xl max-h-[90vh] rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl flex flex-col overflow-hidden animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="p-6 border-b border-zinc-100 dark:border-zinc-800 flex items-start justify-between gap-4 bg-zinc-50/50 dark:bg-zinc-800/30">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase tracking-wider ${
+                      selectedJob.portal === 'LINKEDIN'
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800'
+                        : 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800'
+                    }`}
+                  >
+                    {selectedJob.portal}
+                  </span>
+
+                  {selectedJob.workArrangement === 'REMOTE' ? (
+                    <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                      <Globe className="w-3 h-3" />
+                      <span>Remote</span>
+                    </span>
+                  ) : selectedJob.workArrangement === 'HYBRID' ? (
+                    <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                      <Building2 className="w-3 h-3" />
+                      <span>Hybrid</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center space-x-1 text-[10px] font-bold px-2.5 py-1 rounded-lg bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700">
+                      <MapPin className="w-3 h-3" />
+                      <span>On-site</span>
+                    </span>
+                  )}
+
+                  <span className="flex items-center space-x-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>{selectedJob.matchScore}% Match</span>
+                  </span>
+                </div>
+
+                <h3 className="text-xl font-extrabold text-zinc-900 dark:text-zinc-100 leading-tight">
+                  {selectedJob.title}
+                </h3>
+
+                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span className="font-semibold text-zinc-800 dark:text-zinc-200 flex items-center space-x-1">
+                    <Building2 className="w-3.5 h-3.5" />
+                    <span>{selectedJob.company}</span>
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center space-x-1">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>{selectedJob.location}</span>
+                  </span>
+                  {selectedJob.salary && (
+                    <>
+                      <span>•</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center space-x-1">
+                        <DollarSign className="w-3.5 h-3.5" />
+                        <span>{selectedJob.salary}</span>
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedJob(null)}
+                className="p-2.5 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-200 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body - Scrollable */}
+            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-sm">
+              {/* AI Compatibility Highlight Box */}
+              <div className="bg-gradient-to-r from-blue-50/60 to-indigo-50/60 dark:from-blue-950/30 dark:to-indigo-950/30 p-4 rounded-2xl border border-blue-200/80 dark:border-blue-800/60 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-extrabold text-blue-900 dark:text-blue-200 flex items-center space-x-1.5 uppercase tracking-wider">
+                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>AI Qualification Fit Analysis</span>
+                  </h4>
+                </div>
+
+                <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed font-medium">
+                  {selectedJob.matchReason}
+                </p>
+
+                {selectedJob.strengths.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-zinc-600 dark:text-zinc-400 uppercase tracking-wider">
+                      Matched Strengths:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedJob.strengths.map((st, i) => (
+                        <span
+                          key={i}
+                          className="bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 text-xs font-semibold px-2.5 py-1 rounded-lg"
+                        >
+                          ✓ {st}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedJob.skillGaps.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                      Noticed Gaps / Extra Requirements:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedJob.skillGaps.map((sg, i) => (
+                        <span
+                          key={i}
+                          className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-xs font-semibold px-2.5 py-1 rounded-lg"
+                        >
+                          • {sg}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Full Job Description Section */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-extrabold text-zinc-900 dark:text-zinc-100 flex items-center space-x-2">
+                    <Briefcase className="w-4 h-4 text-zinc-500" />
+                    <span>Full Job Description & Requirements</span>
+                  </h4>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyJD(selectedJob.description)}
+                    className="flex items-center space-x-1 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-600 dark:text-zinc-300 rounded-xl text-xs font-medium transition-all"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copy JD</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="bg-zinc-50 dark:bg-zinc-800/40 p-5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs sm:text-sm leading-relaxed whitespace-pre-wrap font-sans">
+                  {selectedJob.description || 'No detailed description provided by portal.'}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 sm:p-5 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/30 flex flex-wrap items-center justify-between gap-3">
+              <a
+                href={selectedJob.jobUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center space-x-1.5 px-4 py-2.5 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-2xl text-xs font-bold transition-all border border-zinc-200 dark:border-zinc-700"
+              >
+                <span>Open on {selectedJob.portal}</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+
+              <div className="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedJob(null)}
+                  className="px-4 py-2.5 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-2xl transition-all"
+                >
+                  Close
+                </button>
+
+                {selectedJob.trackedStatus === 'APPLIED' ? (
+                  <span className="flex items-center space-x-1.5 px-5 py-2.5 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 rounded-2xl text-xs font-bold border border-blue-200 dark:border-blue-800">
+                    <Check className="w-3.5 h-3.5 text-blue-500" />
+                    <span>Tracked as APPLIED</span>
+                  </span>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleSkipJob(selectedJob)}
+                      className="px-4 py-2.5 text-xs font-semibold text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 rounded-2xl transition-all"
+                    >
+                      Skip Job
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleApplyAndTrack(selectedJob)}
+                      disabled={trackingId === selectedJob.jobId}
+                      className="flex items-center space-x-1.5 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-bold shadow-md shadow-blue-500/20 transition-all"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Apply & Track</span>
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
