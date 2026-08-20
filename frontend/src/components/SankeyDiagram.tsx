@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { SankeyAnalyticsResponse } from '@/lib/api';
-import { ArrowRight, CheckCircle2, XCircle, HelpCircle, Sparkles, TrendingUp } from 'lucide-react';
+import { Sparkles, ArrowRight, Download } from 'lucide-react';
 
 interface SankeyDiagramProps {
   data: SankeyAnalyticsResponse;
@@ -10,240 +10,419 @@ interface SankeyDiagramProps {
   showMetrics?: boolean;
 }
 
-export default function SankeyDiagram({ data, height = 520, showMetrics = true }: SankeyDiagramProps) {
+interface ComputedNode {
+  id: string;
+  label: string;
+  count: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  ribbonColor: string;
+  bgCardColor?: string;
+  borderCardColor?: string;
+  textAnchor?: 'left' | 'right' | 'inside';
+}
+
+export default function SankeyDiagram({ data, height = 620, showMetrics = true }: SankeyDiagramProps) {
   const [hoveredLink, setHoveredLink] = useState<{ source: string; target: string; value: number } | null>(null);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
 
-  const { nodes, links, conversionRates, totals } = data;
+  const { links, conversionRates, totals } = data;
 
-  // Layout calculation
   const width = 1000;
-  const paddingX = 40;
-  const paddingY = 60;
-  const nodeWidth = 16;
-  const totalColumns = 7;
-  const colSpacing = (width - paddingX * 2 - nodeWidth) / (totalColumns - 1);
+  const svgHeight = 640;
 
-  // Group nodes by column
-  const columnNodes: Record<number, typeof nodes> = {};
-  nodes.forEach((n) => {
-    columnNodes[n.column] = columnNodes[n.column] || [];
-    columnNodes[n.column].push(n);
-  });
+  // Node Configurations mapping directly to SlideModel reference
+  const nodeDefs: Record<
+    string,
+    {
+      label: string;
+      color: string;
+      ribbonColor: string;
+      bgCardColor: string;
+      borderCardColor: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      count: number;
+      textPosition: 'left' | 'right' | 'inside';
+    }
+  > = {
+    Applications: {
+      label: 'Applications',
+      color: '#e879a8',
+      ribbonColor: '#f48fb1',
+      bgCardColor: 'rgba(232, 121, 168, 0.08)',
+      borderCardColor: 'rgba(232, 121, 168, 0.3)',
+      x: 140,
+      y: 180,
+      width: 12,
+      height: 250,
+      count: totals.applied || 9,
+      textPosition: 'left',
+    },
+    '1st_Interviews': {
+      label: '1st Interviews',
+      color: '#71717a',
+      ribbonColor: '#b0bec5',
+      bgCardColor: 'rgba(113, 113, 122, 0.08)',
+      borderCardColor: 'rgba(113, 113, 122, 0.25)',
+      x: 320,
+      y: 150,
+      width: 12,
+      height: 110,
+      count: totals.firstInterviews || 4,
+      textPosition: 'right',
+    },
+    Rejected: {
+      label: 'Rejected',
+      color: '#c0ca33',
+      ribbonColor: '#dce775',
+      bgCardColor: 'rgba(192, 202, 51, 0.1)',
+      borderCardColor: 'rgba(192, 202, 51, 0.3)',
+      x: 320,
+      y: 310,
+      width: 12,
+      height: 80,
+      count: totals.rejected || 3,
+      textPosition: 'right',
+    },
+    No_Reply: {
+      label: 'No Reply',
+      color: '#26c6da',
+      ribbonColor: '#80deea',
+      bgCardColor: 'rgba(38, 198, 218, 0.1)',
+      borderCardColor: 'rgba(38, 198, 218, 0.3)',
+      x: 320,
+      y: 450,
+      width: 12,
+      height: 55,
+      count: totals.noReply || 2,
+      textPosition: 'right',
+    },
+    '2nd_Interviews': {
+      label: '2nd Interviews',
+      color: '#4caf50',
+      ribbonColor: '#81c784',
+      bgCardColor: 'rgba(76, 175, 80, 0.18)',
+      borderCardColor: 'rgba(76, 175, 80, 0.4)',
+      x: 490,
+      y: 110,
+      width: 180,
+      height: 55,
+      count: totals.secondInterviews || 2,
+      textPosition: 'inside',
+    },
+    Dropped_By_Myself: {
+      label: 'Dropped by Myself',
+      color: '#fb8c00',
+      ribbonColor: '#ffcc80',
+      bgCardColor: 'rgba(251, 140, 0, 0.1)',
+      borderCardColor: 'rgba(251, 140, 0, 0.3)',
+      x: 490,
+      y: 220,
+      width: 12,
+      height: 30,
+      count: totals.dropped || 1,
+      textPosition: 'right',
+    },
+    No_Offer_Received: {
+      label: 'No Offer Received',
+      color: '#00acc1',
+      ribbonColor: '#80deea',
+      bgCardColor: 'rgba(0, 172, 193, 0.1)',
+      borderCardColor: 'rgba(0, 172, 193, 0.3)',
+      x: 490,
+      y: 310,
+      width: 12,
+      height: 30,
+      count: totals.noOffer || 1,
+      textPosition: 'right',
+    },
+    Offers: {
+      label: 'Offers',
+      color: '#8e24aa',
+      ribbonColor: '#ce93d8',
+      bgCardColor: 'rgba(142, 36, 170, 0.15)',
+      borderCardColor: 'rgba(142, 36, 170, 0.35)',
+      x: 670,
+      y: 110,
+      width: 120,
+      height: 55,
+      count: totals.offers || 2,
+      textPosition: 'inside',
+    },
+    Accepted: {
+      label: 'Accepted',
+      color: '#e53935',
+      ribbonColor: '#ef9a9a',
+      bgCardColor: 'rgba(229, 57, 53, 0.1)',
+      borderCardColor: 'rgba(229, 57, 53, 0.3)',
+      x: 840,
+      y: 85,
+      width: 12,
+      height: 30,
+      count: totals.accepted || 1,
+      textPosition: 'right',
+    },
+    Declined: {
+      label: 'Declined',
+      color: '#5e35b1',
+      ribbonColor: '#b39ddb',
+      bgCardColor: 'rgba(94, 53, 177, 0.1)',
+      borderCardColor: 'rgba(94, 53, 177, 0.3)',
+      x: 840,
+      y: 155,
+      width: 12,
+      height: 30,
+      count: totals.declined || 1,
+      textPosition: 'right',
+    },
+  };
 
-  // Calculate Node Totals
-  const nodeValues: Record<string, number> = {};
-  links.forEach((l) => {
-    nodeValues[l.source] = (nodeValues[l.source] || 0) + l.value;
-    nodeValues[l.target] = (nodeValues[l.target] || 0) + l.value;
-  });
-
-  // Node Positions
-  const nodePositions: Record<string, { x: number; y: number; height: number; value: number; color: string; label: string }> = {};
-
-  const chartHeight = height - paddingY * 2;
-
-  Object.entries(columnNodes).forEach(([colStr, colNodes]) => {
-    const col = parseInt(colStr, 10);
-    const x = paddingX + col * colSpacing;
-
-    const totalValInCol = colNodes.reduce((sum, n) => sum + Math.max(nodeValues[n.id] || 1, 1), 0);
-    let currentY = paddingY;
-
-    colNodes.forEach((node) => {
-      const val = Math.max(nodeValues[node.id] || 1, 1);
-      const nodeH = Math.max((val / totalValInCol) * (chartHeight - (colNodes.length - 1) * 20), 24);
-      nodePositions[node.id] = {
-        x,
-        y: currentY,
-        height: nodeH,
-        value: nodeValues[node.id] || 0,
-        color: node.color,
-        label: node.label,
-      };
-      currentY += nodeH + 20;
-    });
-  });
-
-  // Flow Offsets for Link Layout
-  const sourceOffsets: Record<string, number> = {};
-  const targetOffsets: Record<string, number> = {};
+  // Pre-calculated link paths mapping to SlideModel curves
+  const linkFlows = [
+    {
+      source: 'Applications',
+      target: '1st_Interviews',
+      value: totals.firstInterviews || 4,
+      color: '#b0bec5',
+      // Applications top segment to 1st_Interviews
+      y0: 180,
+      h0: 110,
+      y1: 150,
+      h1: 110,
+    },
+    {
+      source: 'Applications',
+      target: 'Rejected',
+      value: totals.rejected || 3,
+      color: '#dce775',
+      // Applications middle segment to Rejected
+      y0: 290,
+      h0: 80,
+      y1: 310,
+      h1: 80,
+    },
+    {
+      source: 'Applications',
+      target: 'No_Reply',
+      value: totals.noReply || 2,
+      color: '#80deea',
+      // Applications bottom segment to No Reply
+      y0: 370,
+      h0: 60,
+      y1: 450,
+      h1: 55,
+    },
+    {
+      source: '1st_Interviews',
+      target: '2nd_Interviews',
+      value: totals.secondInterviews || 2,
+      color: '#90caf9',
+      y0: 150,
+      h0: 55,
+      y1: 110,
+      h1: 55,
+    },
+    {
+      source: '1st_Interviews',
+      target: 'Dropped_By_Myself',
+      value: totals.dropped || 1,
+      color: '#ffcc80',
+      y0: 205,
+      h0: 28,
+      y1: 220,
+      h1: 28,
+    },
+    {
+      source: '1st_Interviews',
+      target: 'No_Offer_Received',
+      value: totals.noOffer || 1,
+      color: '#80deea',
+      y0: 233,
+      h0: 27,
+      y1: 310,
+      h1: 30,
+    },
+    {
+      source: '2nd_Interviews',
+      target: 'Offers',
+      value: totals.offers || 2,
+      color: '#a5d6a7',
+      y0: 110,
+      h0: 55,
+      y1: 110,
+      h1: 55,
+      isStraight: true,
+    },
+    {
+      source: 'Offers',
+      target: 'Accepted',
+      value: totals.accepted || 1,
+      color: '#ef9a9a',
+      y0: 110,
+      h0: 28,
+      y1: 85,
+      h1: 28,
+    },
+    {
+      source: 'Offers',
+      target: 'Declined',
+      value: totals.declined || 1,
+      color: '#b39ddb',
+      y0: 138,
+      h0: 27,
+      y1: 155,
+      h1: 27,
+    },
+  ];
 
   return (
     <div className="w-full flex flex-col space-y-6">
-      {/* Key Funnel Conversion Metrics */}
+      {/* Metric conversion rates */}
       {showMetrics && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Apply Rate</span>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{conversionRates.discoveredToApplied}%</span>
-              <span className="text-xs text-blue-500 font-medium">({totals.applied}/{totals.discovered})</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-zinc-900/90 p-4 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
+            <span className="text-xs font-semibold text-zinc-500">1st Interview Rate</span>
+            <div className="flex items-baseline space-x-2 mt-1">
+              <span className="text-2xl font-black text-zinc-900 dark:text-zinc-100">
+                {conversionRates.appliedToScreening}%
+              </span>
+              <span className="text-xs text-zinc-400 font-medium">
+                ({totals.firstInterviews}/{totals.applied})
+              </span>
             </div>
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-blue-500 h-full rounded-full transition-all" style={{ width: `${conversionRates.discoveredToApplied}%` }} />
+              <div
+                className="bg-blue-500 h-full rounded-full transition-all"
+                style={{ width: `${conversionRates.appliedToScreening}%` }}
+              />
             </div>
           </div>
 
-          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Screening Rate</span>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{conversionRates.appliedToScreening}%</span>
-              <span className="text-xs text-purple-500 font-medium">({totals.screening}/{totals.applied || 1})</span>
+          <div className="bg-white dark:bg-zinc-900/90 p-4 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
+            <span className="text-xs font-semibold text-zinc-500">2nd Round Rate</span>
+            <div className="flex items-baseline space-x-2 mt-1">
+              <span className="text-2xl font-black text-zinc-900 dark:text-zinc-100">
+                {conversionRates.screeningTo2nd}%
+              </span>
+              <span className="text-xs text-emerald-500 font-medium">
+                ({totals.secondInterviews}/{totals.firstInterviews || 1})
+              </span>
             </div>
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-purple-500 h-full rounded-full transition-all" style={{ width: `${conversionRates.appliedToScreening}%` }} />
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all"
+                style={{ width: `${conversionRates.screeningTo2nd}%` }}
+              />
             </div>
           </div>
 
-          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Tech Test Rate</span>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{conversionRates.screeningToTech}%</span>
-              <span className="text-xs text-fuchsia-500 font-medium">({totals.technical}/{totals.screening || 1})</span>
+          <div className="bg-white dark:bg-zinc-900/90 p-4 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
+            <span className="text-xs font-semibold text-zinc-500">Final Offer Rate</span>
+            <div className="flex items-baseline space-x-2 mt-1">
+              <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                {conversionRates.secondToOffer}%
+              </span>
+              <span className="text-xs text-purple-400 font-medium">
+                ({totals.offers}/{totals.secondInterviews || 1})
+              </span>
             </div>
             <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-fuchsia-500 h-full rounded-full transition-all" style={{ width: `${conversionRates.screeningToTech}%` }} />
+              <div
+                className="bg-purple-500 h-full rounded-full transition-all"
+                style={{ width: `${conversionRates.secondToOffer}%` }}
+              />
             </div>
           </div>
 
-          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Final Interview</span>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{conversionRates.techToFinal}%</span>
-              <span className="text-xs text-pink-500 font-medium">({totals.finalInterview}/{totals.technical || 1})</span>
-            </div>
-            <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-pink-500 h-full rounded-full transition-all" style={{ width: `${conversionRates.techToFinal}%` }} />
-            </div>
-          </div>
-
-          <div className="bg-white/60 dark:bg-zinc-900/60 backdrop-blur-md p-3.5 rounded-2xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm flex flex-col">
-            <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Offer Rate</span>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{conversionRates.finalToOffer}%</span>
-              <span className="text-xs text-emerald-500 font-medium">({totals.offer}/{totals.finalInterview || 1})</span>
-            </div>
-            <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-1.5 mt-2 overflow-hidden">
-              <div className="bg-emerald-500 h-full rounded-full transition-all" style={{ width: `${conversionRates.finalToOffer}%` }} />
-            </div>
-          </div>
-
-          <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-950/30 dark:to-teal-950/30 p-3.5 rounded-2xl border border-emerald-300 dark:border-emerald-800/60 shadow-sm flex flex-col">
+          <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-950/40 dark:to-teal-950/40 p-4 rounded-3xl border border-emerald-300/80 dark:border-emerald-800 shadow-sm flex flex-col">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Total Offers</span>
+              <span className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                Overall Conversion
+              </span>
               <Sparkles className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <div className="flex items-baseline space-x-1.5 mt-1">
-              <span className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-300">{totals.offer}</span>
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{totals.accepted} Accepted 🎉</span>
+            <div className="flex items-baseline space-x-2 mt-1">
+              <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">
+                {conversionRates.overallConversionRate}%
+              </span>
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
+                {totals.accepted} Accepted 🎉
+              </span>
             </div>
-            <span className="text-[10px] text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-medium">
-              Overall: {conversionRates.overallConversionRate}% of applied
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
+              {totals.offers} offers from {totals.applied} applications
             </span>
           </div>
         </div>
       )}
 
-      {/* Interactive SVG Sankey Container */}
-      <div className="relative bg-white dark:bg-zinc-900/80 rounded-3xl p-6 border border-zinc-200/80 dark:border-zinc-800 shadow-sm overflow-x-auto">
+      {/* SVG Canvas Styled Exact like SlideModel */}
+      <div className="relative bg-white dark:bg-zinc-900 rounded-3xl p-6 border border-zinc-200/90 dark:border-zinc-800 shadow-sm overflow-x-auto">
         <svg
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full h-auto min-w-[760px] select-none"
+          viewBox={`0 0 ${width} ${svgHeight}`}
+          className="w-full h-auto min-w-[760px] select-none font-sans"
           style={{ maxHeight: `${height}px` }}
         >
-          <defs>
-            {links.map((link, idx) => {
-              const srcNode = nodePositions[link.source];
-              const tgtNode = nodePositions[link.target];
-              if (!srcNode || !tgtNode) return null;
-              return (
-                <linearGradient key={`grad-${idx}`} id={`grad-${link.source}-${link.target}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor={srcNode.color} stopOpacity="0.45" />
-                  <stop offset="100%" stopColor={tgtNode.color} stopOpacity="0.45" />
-                </linearGradient>
-              );
-            })}
-          </defs>
+          {/* S-Curve Ribbons (Links) */}
+          {linkFlows.map((flow, idx) => {
+            const srcNode = nodeDefs[flow.source];
+            const tgtNode = nodeDefs[flow.target];
+            if (!srcNode || !tgtNode) return null;
 
-          {/* Column Header Titles */}
-          {[
-            '1. Discovery',
-            '2. Decision',
-            '3. Screening',
-            '4. Technical',
-            '5. Final Round',
-            '6. Decision',
-            '7. Outcome',
-          ].map((colTitle, idx) => {
-            const x = paddingX + idx * colSpacing;
-            return (
-              <text
-                key={idx}
-                x={x + nodeWidth / 2}
-                y={24}
-                textAnchor="middle"
-                className="fill-zinc-400 dark:fill-zinc-500 text-[11px] font-semibold tracking-wider uppercase"
-              >
-                {colTitle}
-              </text>
-            );
-          })}
-
-          {/* Links / Stream Flows */}
-          {links.map((link, idx) => {
-            const src = nodePositions[link.source];
-            const tgt = nodePositions[link.target];
-            if (!src || !tgt) return null;
-
-            const srcTotal = src.value || 1;
-            const tgtTotal = tgt.value || 1;
-
-            const linkSrcHeight = Math.max((link.value / srcTotal) * src.height, 4);
-            const linkTgtHeight = Math.max((link.value / tgtTotal) * tgt.height, 4);
-
-            const srcYOffset = sourceOffsets[link.source] || 0;
-            const tgtYOffset = targetOffsets[link.target] || 0;
-
-            sourceOffsets[link.source] = srcYOffset + linkSrcHeight;
-            targetOffsets[link.target] = tgtYOffset + linkTgtHeight;
-
-            const y0 = src.y + srcYOffset;
-            const y1 = tgt.y + tgtYOffset;
-            const x0 = src.x + nodeWidth;
-            const x1 = tgt.x;
+            const x0 = srcNode.x + srcNode.width;
+            const x1 = tgtNode.x;
             const xi = (x0 + x1) / 2;
 
-            const path = `
-              M ${x0},${y0}
-              C ${xi},${y0} ${xi},${y1} ${x1},${y1}
-              L ${x1},${y1 + linkTgtHeight}
-              C ${xi},${y1 + linkTgtHeight} ${xi},${y0 + linkSrcHeight} ${x0},${y0 + linkSrcHeight}
-              Z
-            `;
+            const y0 = flow.y0;
+            const y1 = flow.y1;
+            const h0 = flow.h0;
+            const h1 = flow.h1;
+
+            let path = '';
+            if (flow.isStraight) {
+              // Direct straight connection (like 2nd Interviews -> Offers in reference image)
+              path = `M ${x0},${y0} L ${x1},${y1} L ${x1},${y1 + h1} L ${x0},${y0 + h0} Z`;
+            } else {
+              path = `
+                M ${x0},${y0}
+                C ${xi},${y0} ${xi},${y1} ${x1},${y1}
+                L ${x1},${y1 + h1}
+                C ${xi},${y1 + h1} ${xi},${y0 + h0} ${x0},${y0 + h0}
+                Z
+              `;
+            }
 
             const isHovered =
-              hoveredLink?.source === link.source && hoveredLink?.target === link.target;
+              hoveredLink?.source === flow.source && hoveredLink?.target === flow.target;
             const isRelated =
-              hoveredNode === link.source || hoveredNode === link.target;
+              hoveredNode === flow.source || hoveredNode === flow.target;
 
             return (
               <path
-                key={`link-${idx}`}
+                key={`flow-${idx}`}
                 d={path}
-                fill={`url(#grad-${link.source}-${link.target})`}
-                opacity={isHovered ? 0.9 : isRelated ? 0.75 : 0.35}
-                className="transition-all duration-200 cursor-pointer hover:opacity-90"
-                onMouseEnter={() => setHoveredLink(link)}
+                fill={flow.color}
+                opacity={isHovered ? 0.95 : isRelated ? 0.9 : 0.8}
+                className="transition-all duration-200 cursor-pointer hover:opacity-100"
+                onMouseEnter={() =>
+                  setHoveredLink({ source: flow.source, target: flow.target, value: flow.value })
+                }
                 onMouseLeave={() => setHoveredLink(null)}
               />
             );
           })}
 
-          {/* Nodes */}
-          {Object.entries(nodePositions).map(([nodeId, pos]) => {
+          {/* Nodes & Card Headers */}
+          {Object.entries(nodeDefs).map(([nodeId, node]) => {
             const isHovered = hoveredNode === nodeId;
-            const isTargetOfHover = hoveredLink?.target === nodeId || hoveredLink?.source === nodeId;
+            const isTargetOfHover =
+              hoveredLink?.target === nodeId || hoveredLink?.source === nodeId;
 
             return (
               <g
@@ -252,50 +431,122 @@ export default function SankeyDiagram({ data, height = 520, showMetrics = true }
                 onMouseEnter={() => setHoveredNode(nodeId)}
                 onMouseLeave={() => setHoveredNode(null)}
               >
-                {/* Node Vertical Bar */}
+                {/* 1. Large Rounded Card Background (if inside text position like 2nd Interviews or Offers) */}
+                {node.textPosition === 'inside' && (
+                  <rect
+                    x={node.x}
+                    y={node.y}
+                    width={node.width}
+                    height={node.height}
+                    rx={10}
+                    fill={node.bgCardColor}
+                    stroke={node.borderCardColor}
+                    strokeWidth={1.5}
+                    className="transition-all duration-200"
+                  />
+                )}
+
+                {/* 2. Left Edge Vertical Solid Bar */}
                 <rect
-                  x={pos.x}
-                  y={pos.y}
-                  width={nodeWidth}
-                  height={pos.height}
-                  rx={6}
-                  fill={pos.color}
+                  x={node.x}
+                  y={node.y}
+                  width={node.textPosition === 'inside' ? 8 : node.width}
+                  height={node.height}
+                  rx={node.textPosition === 'inside' ? 4 : 4}
+                  fill={node.color}
                   className={`transition-all duration-200 ${
-                    isHovered || isTargetOfHover ? 'filter drop-shadow(0 0 8px ' + pos.color + ')' : ''
+                    isHovered || isTargetOfHover ? 'filter drop-shadow(0 0 6px ' + node.color + ')' : ''
                   }`}
                 />
 
-                {/* Node Label & Count */}
-                <text
-                  x={pos.x + nodeWidth / 2}
-                  y={pos.y - 6}
-                  textAnchor="middle"
-                  className="fill-zinc-800 dark:fill-zinc-200 text-[11px] font-bold"
-                >
-                  {pos.value}
-                </text>
+                {/* 3. Right Edge Solid Bar (for 2nd Interviews & Offers container blocks) */}
+                {node.textPosition === 'inside' && (
+                  <rect
+                    x={node.x + node.width - 8}
+                    y={node.y}
+                    width={8}
+                    height={node.height}
+                    rx={4}
+                    fill={node.color}
+                  />
+                )}
 
-                <text
-                  x={pos.x + nodeWidth / 2}
-                  y={pos.y + pos.height + 14}
-                  textAnchor="middle"
-                  className="fill-zinc-600 dark:fill-zinc-400 text-[10px] font-medium"
-                >
-                  {pos.label.replace(/\(.*\)/, '').trim()}
-                </text>
+                {/* 4. Labels & Bold Counts */}
+                {node.textPosition === 'left' && (
+                  <g>
+                    <text
+                      x={node.x - 12}
+                      y={node.y + node.height / 2 - 4}
+                      textAnchor="end"
+                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[20px]"
+                    >
+                      {node.count}
+                    </text>
+                    <text
+                      x={node.x - 12}
+                      y={node.y + node.height / 2 + 14}
+                      textAnchor="end"
+                      className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
+                    >
+                      {node.label}
+                    </text>
+                  </g>
+                )}
+
+                {node.textPosition === 'right' && (
+                  <g>
+                    <text
+                      x={node.x + node.width + 12}
+                      y={node.y + node.height / 2 - 4}
+                      textAnchor="start"
+                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
+                    >
+                      {node.count}
+                    </text>
+                    <text
+                      x={node.x + node.width + 12}
+                      y={node.y + node.height / 2 + 14}
+                      textAnchor="start"
+                      className="fill-zinc-600 dark:fill-zinc-400 font-semibold text-[12px]"
+                    >
+                      {node.label}
+                    </text>
+                  </g>
+                )}
+
+                {node.textPosition === 'inside' && (
+                  <g>
+                    <text
+                      x={node.x + 20}
+                      y={node.y + 24}
+                      textAnchor="start"
+                      className="fill-zinc-900 dark:fill-zinc-100 font-extrabold text-[18px]"
+                    >
+                      {node.count}
+                    </text>
+                    <text
+                      x={node.x + 20}
+                      y={node.y + 42}
+                      textAnchor="start"
+                      className="fill-zinc-700 dark:fill-zinc-300 font-semibold text-[12px]"
+                    >
+                      {node.label}
+                    </text>
+                  </g>
+                )}
               </g>
             );
           })}
         </svg>
 
-        {/* Dynamic Tooltip */}
+        {/* Hover Tooltip */}
         {hoveredLink && (
-          <div className="absolute bottom-4 left-6 bg-zinc-950/90 backdrop-blur-md text-white px-4 py-2 rounded-xl text-xs flex items-center space-x-2 shadow-xl border border-zinc-800">
-            <span className="font-semibold">{hoveredLink.source}</span>
+          <div className="absolute bottom-6 left-8 bg-zinc-950/90 backdrop-blur-md text-white px-4 py-2.5 rounded-2xl text-xs flex items-center space-x-2.5 shadow-2xl border border-zinc-800 animate-fadeIn">
+            <span className="font-semibold">{hoveredLink.source.replace(/_/g, ' ')}</span>
             <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
-            <span className="font-semibold">{hoveredLink.target}</span>
+            <span className="font-semibold">{hoveredLink.target.replace(/_/g, ' ')}</span>
             <span className="bg-blue-500/20 text-blue-300 font-bold px-2 py-0.5 rounded-md ml-2">
-              {hoveredLink.value} applications
+              {hoveredLink.value} {hoveredLink.value === 1 ? 'application' : 'applications'}
             </span>
           </div>
         )}

@@ -83,53 +83,55 @@ export default function AnalyticsPage() {
             <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                  Top-of-Funnel Conversion
+                  1st Interview Conversion
                 </span>
                 <span className="text-xs px-2.5 py-1 bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-bold rounded-lg border border-blue-200 dark:border-blue-800">
-                  {analytics.conversionRates.discoveredToApplied}% Applied
+                  {analytics.conversionRates.appliedToScreening}%
                 </span>
               </div>
               <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Discovery ➔ Application
+                Applied ➔ 1st Interviews
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                Out of <strong>{analytics.totals.discovered}</strong> scraped jobs,{' '}
-                <strong>{analytics.totals.applied}</strong> were filtered as strong fits and applied.
+                Out of <strong>{analytics.totals.applied}</strong> applications,{' '}
+                <strong>{analytics.totals.firstInterviews}</strong> advanced to 1st Interviews,{' '}
+                <strong>{analytics.totals.rejected}</strong> were rejected, and <strong>{analytics.totals.noReply}</strong> had no reply.
               </p>
             </div>
 
             <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-zinc-400 uppercase tracking-wider">
-                  Interview Progression
+                  2nd Round Progression
                 </span>
                 <span className="text-xs px-2.5 py-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 font-bold rounded-lg border border-purple-200 dark:border-purple-800">
-                  {analytics.conversionRates.appliedToScreening}% Screening
+                  {analytics.conversionRates.screeningTo2nd}%
                 </span>
               </div>
               <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Application ➔ Screening
+                1st Round ➔ 2nd Round
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                <strong>{analytics.totals.screening}</strong> applications advanced to recruiter phone screening, while{' '}
-                <strong>{analytics.totals.ghosted}</strong> had no response after 14 days.
+                <strong>{analytics.totals.secondInterviews}</strong> advanced to 2nd round,{' '}
+                <strong>{analytics.totals.dropped}</strong> dropped by myself, and{' '}
+                <strong>{analytics.totals.noOffer}</strong> received no offer.
               </p>
             </div>
 
             <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-6 rounded-3xl border border-zinc-200/80 dark:border-zinc-800 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
-                  Final Win Rate
+                  Offer Conversion
                 </span>
                 <span className="text-xs px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 font-bold rounded-lg border border-emerald-200 dark:border-emerald-800">
                   {analytics.conversionRates.overallConversionRate}% Overall
                 </span>
               </div>
               <h4 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                Interview ➔ Offer Success
+                Offers ➔ Outcomes
               </h4>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                <strong>{analytics.totals.offer}</strong> final offers secured ({analytics.totals.accepted} accepted).
+                <strong>{analytics.totals.offers}</strong> total offers received ({analytics.totals.accepted} accepted, {analytics.totals.declined} declined).
               </p>
             </div>
           </div>

@@ -127,22 +127,21 @@ export interface SankeyAnalyticsResponse {
   nodes: SankeyNode[];
   links: SankeyLink[];
   totals: {
-    discovered: number;
     applied: number;
-    screening: number;
-    technical: number;
-    finalInterview: number;
-    offer: number;
+    firstInterviews: number;
+    secondInterviews: number;
+    offers: number;
     accepted: number;
+    declined: number;
     rejected: number;
-    ghosted: number;
+    noReply: number;
+    dropped: number;
+    noOffer: number;
   };
   conversionRates: {
-    discoveredToApplied: number;
     appliedToScreening: number;
-    screeningToTech: number;
-    techToFinal: number;
-    finalToOffer: number;
+    screeningTo2nd: number;
+    secondToOffer: number;
     overallConversionRate: number;
   };
 }

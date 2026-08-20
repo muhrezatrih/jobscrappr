@@ -317,166 +317,134 @@ export class JobsService {
       },
     });
 
-    // Pipeline Stage Node Hierarchy:
-    // Column 0: Discovered
-    // Column 1: Applied / Skipped
-    // Column 2: HR Screening / Rejected (Early) / Ghosted
-    // Column 3: Technical Test / Rejected
-    // Column 4: Final Interview / Rejected
-    // Column 5: Offer Received / Rejected
-    // Column 6: Offer Accepted / Offer Declined
+    // Pipeline Stage Node Hierarchy matching SlideModel style:
+    // Column 0: Applications
+    // Column 1: 1st Interviews, Rejected, No Reply
+    // Column 2: 2nd Interviews, Dropped by Myself, No Offer Received
+    // Column 3: Offers
+    // Column 4: Accepted, Declined
 
     const nodes = [
-      { id: 'Discovered', label: 'Discovered (24h Scraped)', color: '#6366f1', column: 0 },
-      { id: 'Skipped', label: 'Skipped (Unfit)', color: '#64748b', column: 1 },
-      { id: 'Applied', label: 'Applied', color: '#3b82f6', column: 1 },
-      { id: 'Ghosted', label: 'Ghosted / No Reply', color: '#94a3b8', column: 2 },
-      { id: 'Rejected_Early', label: 'Resume Rejected', color: '#ef4444', column: 2 },
-      { id: 'HR_Screening', label: 'HR Screening', color: '#8b5cf6', column: 2 },
-      { id: 'Technical_Test', label: 'Technical Test & Interview', color: '#a855f7', column: 3 },
-      { id: 'Rejected_Tech', label: 'Tech Rejected', color: '#f43f5e', column: 3 },
-      { id: 'Final_Interview', label: 'Final Interview', color: '#ec4899', column: 4 },
-      { id: 'Rejected_Final', label: 'Final Rejected', color: '#e11d48', column: 4 },
-      { id: 'Offer_Received', label: 'Offer Received', color: '#10b981', column: 5 },
-      { id: 'Offer_Accepted', label: 'Offer Accepted 🎉', color: '#059669', column: 6 },
-      { id: 'Offer_Declined', label: 'Offer Declined', color: '#d97706', column: 6 },
+      { id: 'Applications', label: 'Applications', color: '#e879a8', ribbonColor: '#f48fb1', column: 0 },
+      { id: '1st_Interviews', label: '1st Interviews', color: '#71717a', ribbonColor: '#b0bec5', column: 1 },
+      { id: 'Rejected', label: 'Rejected', color: '#c0ca33', ribbonColor: '#dce775', column: 1 },
+      { id: 'No_Reply', label: 'No Reply', color: '#26c6da', ribbonColor: '#80deea', column: 1 },
+      { id: '2nd_Interviews', label: '2nd Interviews', color: '#4caf50', ribbonColor: '#81c784', column: 2 },
+      { id: 'Dropped_By_Myself', label: 'Dropped by Myself', color: '#fb8c00', ribbonColor: '#ffcc80', column: 2 },
+      { id: 'No_Offer_Received', label: 'No Offer Received', color: '#00acc1', ribbonColor: '#80deea', column: 2 },
+      { id: 'Offers', label: 'Offers', color: '#8e24aa', ribbonColor: '#ce93d8', column: 3 },
+      { id: 'Accepted', label: 'Accepted', color: '#e53935', ribbonColor: '#ef9a9a', column: 4 },
+      { id: 'Declined', label: 'Declined', color: '#5e35b1', ribbonColor: '#b39ddb', column: 4 },
     ];
 
     const linkCounts: Record<string, number> = {};
 
-    const addLink = (source: string, target: string) => {
+    const addLink = (source: string, target: string, count: number = 1) => {
       const key = `${source}->${target}`;
-      linkCounts[key] = (linkCounts[key] || 0) + 1;
+      linkCounts[key] = (linkCounts[key] || 0) + count;
     };
 
-    let totalDiscovered = allApps.length;
     let totalApplied = 0;
-    let totalScreening = 0;
-    let totalTech = 0;
-    let totalFinal = 0;
+    let total1st = 0;
+    let total2nd = 0;
     let totalOffers = 0;
     let totalAccepted = 0;
+    let totalDeclined = 0;
     let totalRejected = 0;
-    let totalGhosted = 0;
+    let totalNoReply = 0;
+    let totalDropped = 0;
+    let totalNoOffer = 0;
 
     for (const app of allApps) {
-      const history = app.stageHistory.map((h) => h.toStatus);
-      const current = app.status;
-
-      // Every tracked job originates from Discovered
-      if (current === 'SKIPPED') {
-        addLink('Discovered', 'Skipped');
+      if (app.status === 'SKIPPED') {
         continue;
       }
 
-      addLink('Discovered', 'Applied');
       totalApplied++;
+      const current = app.status;
+      const history = app.stageHistory.map((h) => h.toStatus);
 
       if (current === 'APPLIED') {
         continue;
       }
 
       if (current === 'GHOSTED') {
-        addLink('Applied', 'Ghosted');
-        totalGhosted++;
+        addLink('Applications', 'No_Reply');
+        totalNoReply++;
         continue;
       }
 
       if (current === 'REJECTED' && !history.includes('HR_SCREENING') && !history.includes('TECHNICAL_TEST') && !history.includes('FINAL_INTERVIEW')) {
-        addLink('Applied', 'Rejected_Early');
+        addLink('Applications', 'Rejected');
         totalRejected++;
         continue;
       }
 
-      // Reached HR Screening
+      // Advanced to 1st Interviews
       if (history.includes('HR_SCREENING') || ['HR_SCREENING', 'TECHNICAL_TEST', 'FINAL_INTERVIEW', 'OFFER_RECEIVED', 'OFFER_ACCEPTED', 'OFFER_DECLINED'].includes(current)) {
-        addLink('Applied', 'HR_Screening');
-        totalScreening++;
+        addLink('Applications', '1st_Interviews');
+        total1st++;
 
         if (current === 'HR_SCREENING') continue;
 
         if (current === 'REJECTED' && !history.includes('TECHNICAL_TEST') && !history.includes('FINAL_INTERVIEW')) {
-          addLink('HR_Screening', 'Rejected_Early');
-          totalRejected++;
+          addLink('1st_Interviews', 'No_Offer_Received');
+          totalNoOffer++;
           continue;
         }
 
-        // Reached Technical Test
+        // Advanced to 2nd Interviews
         if (history.includes('TECHNICAL_TEST') || ['TECHNICAL_TEST', 'FINAL_INTERVIEW', 'OFFER_RECEIVED', 'OFFER_ACCEPTED', 'OFFER_DECLINED'].includes(current)) {
-          addLink('HR_Screening', 'Technical_Test');
-          totalTech++;
+          addLink('1st_Interviews', '2nd_Interviews');
+          total2nd++;
 
-          if (current === 'TECHNICAL_TEST') continue;
+          if (current === 'TECHNICAL_TEST' || current === 'FINAL_INTERVIEW') continue;
 
-          if (current === 'REJECTED' && !history.includes('FINAL_INTERVIEW')) {
-            addLink('Technical_Test', 'Rejected_Tech');
-            totalRejected++;
+          if (current === 'REJECTED') {
+            addLink('2nd_Interviews', 'No_Offer_Received');
+            totalNoOffer++;
             continue;
           }
 
-          // Reached Final Interview
-          if (history.includes('FINAL_INTERVIEW') || ['FINAL_INTERVIEW', 'OFFER_RECEIVED', 'OFFER_ACCEPTED', 'OFFER_DECLINED'].includes(current)) {
-            addLink('Technical_Test', 'Final_Interview');
-            totalFinal++;
+          // Reached Offers
+          if (['OFFER_RECEIVED', 'OFFER_ACCEPTED', 'OFFER_DECLINED'].includes(current)) {
+            addLink('2nd_Interviews', 'Offers');
+            totalOffers++;
 
-            if (current === 'FINAL_INTERVIEW') continue;
-
-            if (current === 'REJECTED') {
-              addLink('Final_Interview', 'Rejected_Final');
-              totalRejected++;
-              continue;
-            }
-
-            // Reached Offer Received
-            if (['OFFER_RECEIVED', 'OFFER_ACCEPTED', 'OFFER_DECLINED'].includes(current)) {
-              addLink('Final_Interview', 'Offer_Received');
-              totalOffers++;
-
-              if (current === 'OFFER_ACCEPTED') {
-                addLink('Offer_Received', 'Offer_Accepted');
-                totalAccepted++;
-              } else if (current === 'OFFER_DECLINED') {
-                addLink('Offer_Received', 'Offer_Declined');
-              }
+            if (current === 'OFFER_ACCEPTED') {
+              addLink('Offers', 'Accepted');
+              totalAccepted++;
+            } else if (current === 'OFFER_DECLINED') {
+              addLink('Offers', 'Declined');
+              totalDeclined++;
             }
           }
         }
       }
     }
 
-    // Default sample flow demonstration if database has few applications yet
-    if (Object.keys(linkCounts).length === 0) {
-      addLink('Discovered', 'Applied');
-      addLink('Discovered', 'Skipped');
-      addLink('Applied', 'HR_Screening');
-      addLink('Applied', 'Ghosted');
-      addLink('HR_Screening', 'Technical_Test');
-      addLink('HR_Screening', 'Rejected_Early');
-      addLink('Technical_Test', 'Final_Interview');
-      addLink('Final_Interview', 'Offer_Received');
-      addLink('Offer_Received', 'Offer_Accepted');
-      linkCounts['Discovered->Applied'] = 24;
-      linkCounts['Discovered->Skipped'] = 12;
-      linkCounts['Applied->HR_Screening'] = 14;
-      linkCounts['Applied->Ghosted'] = 6;
-      linkCounts['Applied->Rejected_Early'] = 4;
-      linkCounts['HR_Screening->Technical_Test'] = 8;
-      linkCounts['HR_Screening->Rejected_Early'] = 6;
-      linkCounts['Technical_Test->Final_Interview'] = 5;
-      linkCounts['Technical_Test->Rejected_Tech'] = 3;
-      linkCounts['Final_Interview->Offer_Received'] = 3;
-      linkCounts['Final_Interview->Rejected_Final'] = 2;
-      linkCounts['Offer_Received->Offer_Accepted'] = 1;
-      linkCounts['Offer_Received->Offer_Declined'] = 2;
-      totalDiscovered = 36;
-      totalApplied = 24;
-      totalScreening = 14;
-      totalTech = 8;
-      totalFinal = 5;
-      totalOffers = 3;
+    // Default sample flow demonstration if database has fewer than 3 applications
+    if (totalApplied < 3) {
+      linkCounts['Applications->1st_Interviews'] = 4;
+      linkCounts['Applications->Rejected'] = 3;
+      linkCounts['Applications->No_Reply'] = 2;
+      linkCounts['1st_Interviews->2nd_Interviews'] = 2;
+      linkCounts['1st_Interviews->Dropped_By_Myself'] = 1;
+      linkCounts['1st_Interviews->No_Offer_Received'] = 1;
+      linkCounts['2nd_Interviews->Offers'] = 2;
+      linkCounts['Offers->Accepted'] = 1;
+      linkCounts['Offers->Declined'] = 1;
+
+      totalApplied = 9;
+      total1st = 4;
+      totalRejected = 3;
+      totalNoReply = 2;
+      total2nd = 2;
+      totalDropped = 1;
+      totalNoOffer = 1;
+      totalOffers = 2;
       totalAccepted = 1;
-      totalRejected = 15;
-      totalGhosted = 6;
+      totalDeclined = 1;
     }
 
     const links = Object.entries(linkCounts).map(([key, value]) => {
@@ -485,11 +453,9 @@ export class JobsService {
     });
 
     const conversionRates = {
-      discoveredToApplied: totalDiscovered > 0 ? Math.round((totalApplied / totalDiscovered) * 100) : 0,
-      appliedToScreening: totalApplied > 0 ? Math.round((totalScreening / totalApplied) * 100) : 0,
-      screeningToTech: totalScreening > 0 ? Math.round((totalTech / totalScreening) * 100) : 0,
-      techToFinal: totalTech > 0 ? Math.round((totalFinal / totalTech) * 100) : 0,
-      finalToOffer: totalFinal > 0 ? Math.round((totalOffers / totalFinal) * 100) : 0,
+      appliedToScreening: totalApplied > 0 ? Math.round((total1st / totalApplied) * 100) : 0,
+      screeningTo2nd: total1st > 0 ? Math.round((total2nd / total1st) * 100) : 0,
+      secondToOffer: total2nd > 0 ? Math.round((totalOffers / total2nd) * 100) : 0,
       overallConversionRate: totalApplied > 0 ? Math.round((totalOffers / totalApplied) * 100) : 0,
     };
 
@@ -497,15 +463,16 @@ export class JobsService {
       nodes,
       links,
       totals: {
-        discovered: totalDiscovered,
         applied: totalApplied,
-        screening: totalScreening,
-        technical: totalTech,
-        finalInterview: totalFinal,
-        offer: totalOffers,
+        firstInterviews: total1st,
+        secondInterviews: total2nd,
+        offers: totalOffers,
         accepted: totalAccepted,
+        declined: totalDeclined,
         rejected: totalRejected,
-        ghosted: totalGhosted,
+        noReply: totalNoReply,
+        dropped: totalDropped,
+        noOffer: totalNoOffer,
       },
       conversionRates,
     };

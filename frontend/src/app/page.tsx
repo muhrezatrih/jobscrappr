@@ -156,8 +156,8 @@ export default function DashboardPage() {
               <span>Sankey Funnel Velocity</span>
             </div>
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-              {sankeyData.totals.applied} Applied ➔ {sankeyData.totals.screening} Screened ➔{' '}
-              {sankeyData.totals.offer} Offers ({sankeyData.conversionRates.overallConversionRate}% conversion)
+              {sankeyData.totals.applied} Applied ➔ {sankeyData.totals.firstInterviews} 1st Interviews ➔{' '}
+              {sankeyData.totals.offers} Offers ({sankeyData.conversionRates.overallConversionRate}% conversion)
             </h3>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Track real-time candidate flow and drop-offs automatically as you update job application statuses.
