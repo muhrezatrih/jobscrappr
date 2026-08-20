@@ -3,9 +3,9 @@ import '../styles/globals.css';
 import { Navbar } from '@/components/Navbar';
 
 export const metadata: Metadata = {
-  title: 'JobFlow AI — Intelligent Precision Job Auto-Applier',
+  title: 'JobFlow Scrappr — AI Job Discovery, Pipeline & Sankey Analytics',
   description:
-    'Automated job application platform powered by Google Gemini AI for Jobstreet with smart compatibility evaluation, tailored cover letters, and real-time execution reporting.',
+    'Automated 24h job discovery, AI candidate matching, interactive Kanban pipeline tracking, and real-time Sankey diagram funnel analytics.',
 };
 
 export default function RootLayout({
@@ -15,17 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" data-theme="dark">
-      <body>
+      <body className="min-h-screen bg-[#090a0f] text-[#f5f5f7] antialiased">
         <Navbar />
-        <main
-          style={{
-            maxWidth: '1280px',
-            margin: '0 auto',
-            padding: '2rem 1.25rem 4rem',
-            position: 'relative',
-            zIndex: 1,
-          }}
-        >
+        <main className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-1">
           {children}
         </main>
       </body>
